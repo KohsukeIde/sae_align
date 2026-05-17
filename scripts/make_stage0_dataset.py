@@ -4,12 +4,14 @@
 The generated dataset stores, for each sampled state-action pair:
 
 - action-induced physical change magnitude E_x;
-- channel-wise observation deltas and detectability scores;
+- channel-wise observation detectability scores for all samples;
+- dense channel deltas for a configurable subset of samples;
 - metadata for action type and state/action IDs;
 - example observations for plotting.
 
-This script uses the toy Powderworld-like environment by default.  It is meant
-as a protocol/debugging entrypoint, not the final simulator integration.
+Dense deltas can be memory-heavy. For larger Stage 0 runs, use
+``--max-delta-samples`` to store only a subset for redundancy probes while still
+storing detectability scores for all state-action pairs.
 """
 
 from __future__ import annotations
@@ -20,7 +22,6 @@ from pathlib import Path as _Path
 _REPO_SRC = _Path(__file__).resolve().parents[1] / "src"
 if str(_REPO_SRC) not in sys.path:
     sys.path.insert(0, str(_REPO_SRC))
-
 
 import argparse
 from pathlib import Path
@@ -57,7 +58,30 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--seed", type=int, default=None)
     p.add_argument("--channels", nargs="*", default=None)
     p.add_argument("--store-examples", type=int, default=16)
+    p.add_argument(
+        "--max-delta-samples",
+        type=int,
+        default=None,
+        help="Store dense delta arrays for at most this many state-action samples. Detectability is still stored for all samples.",
+    )
+    p.add_argument(
+        "--max-delta-bytes",
+        type=int,
+        default=None,
+        help="Fail before generation if dense delta storage is estimated to exceed this many bytes.",
+    )
     return p.parse_args()
+
+
+def estimate_delta_bytes(grid_size: int, channels: List[str], max_delta_samples: int) -> int:
+    probe_grid = np.zeros((grid_size, grid_size), dtype=np.int16)
+    probe_action = Action("place", x=min(1, grid_size - 1), y=min(1, grid_size - 1), element=1)
+    event_counts = np.zeros(len(EVENT_NAMES), dtype=np.float32)
+    per_sample = 0
+    for ch in channels:
+        arr = render_channel(probe_grid, ch, action=probe_action, event_counts=event_counts, noise_seed=0)
+        per_sample += int(arr.astype(np.float32).nbytes)
+    return int(per_sample * max_delta_samples)
 
 
 def main() -> None:
@@ -69,14 +93,34 @@ def main() -> None:
     horizon = args.horizon or int(cfg.get("horizon", 3))
     seed = args.seed if args.seed is not None else int(cfg.get("seed", 0))
     channels = args.channels or list(cfg.get("channels", DEFAULT_CHANNELS))
+    max_delta_samples = args.max_delta_samples
+    if max_delta_samples is None:
+        max_delta_samples = int(cfg.get("max_delta_samples", n_states * k_actions))
+    max_delta_bytes = args.max_delta_bytes
+    if max_delta_bytes is None:
+        max_delta_bytes = int(cfg.get("max_delta_bytes", 1_000_000_000))
 
     env = ToyPowderWorld(grid_size=grid_size, seed=seed)
-    rng = np.random.default_rng(seed)
+    rng = np.random.default_rng(seed + 12345)
     states = [env.sample_state() for _ in range(n_states)]
     actions = env.make_action_bank(k=k_actions)
     noop = Action("noop")
 
     n = n_states * k_actions
+    max_delta_samples = max(1, min(int(max_delta_samples), n))
+    estimated_delta_bytes = estimate_delta_bytes(grid_size, channels, max_delta_samples)
+    if estimated_delta_bytes > max_delta_bytes:
+        raise MemoryError(
+            "Estimated dense delta storage is too large: "
+            f"{estimated_delta_bytes} bytes > budget {max_delta_bytes} bytes. "
+            "Lower --max-delta-samples or raise --max-delta-bytes intentionally."
+        )
+    if max_delta_samples >= n:
+        delta_keep = np.ones(n, dtype=bool)
+    else:
+        delta_keep = np.zeros(n, dtype=bool)
+        delta_keep[rng.choice(n, size=max_delta_samples, replace=False)] = True
+
     world_delta = np.zeros(n, dtype=np.float32)
     state_id = np.zeros(n, dtype=np.int32)
     action_id = np.zeros(n, dtype=np.int32)
@@ -91,7 +135,6 @@ def main() -> None:
 
     idx = 0
     for si, grid in enumerate(states):
-        # No-op final grid per state can be reused for each action.
         noop_roll = env.rollout(grid, noop, horizon=horizon)
         for ai, action in enumerate(actions):
             act_roll = env.rollout(grid, action, horizon=horizon)
@@ -118,10 +161,12 @@ def main() -> None:
                     noise_seed=seed_base,
                 )
                 delta = (obs_a - obs_n).astype(np.float32)
-                deltas[ch].append(delta)
                 detect[ch][idx] = channel_detectability(delta)
+                if delta_keep[idx]:
+                    deltas[ch].append(delta)
                 if idx < args.store_examples:
                     example_obs[ch].append(obs_a.astype(np.float32))
+
             if idx < args.store_examples:
                 example_meta.append((si, ai, action.action_type, int(action.x), int(action.y), int(action.element)))
             idx += 1
@@ -137,19 +182,31 @@ def main() -> None:
         "grid_size": np.array([grid_size], dtype=np.int32),
         "horizon": np.array([horizon], dtype=np.int32),
         "seed": np.array([seed], dtype=np.int32),
+        "schema_version": np.array(["stage0_v2"]),
+        "delta_sample_indices": np.nonzero(delta_keep)[0].astype(np.int64),
+        "max_delta_samples": np.array([max_delta_samples], dtype=np.int32),
+        "estimated_delta_bytes": np.array([estimated_delta_bytes], dtype=np.int64),
+        "diagnostic_only_channels": np.array(list(cfg.get("diagnostic_only_channels", ["event_response"]))),
+        "stageb_default_channels": np.array(list(cfg.get("stageb_default_channels", ["rgb", "range", "local"]))),
     }
+
     for ch in channels:
         arrays[f"detect_{ch}"] = detect[ch]
-        arrays[f"delta_{ch}"] = np.stack(deltas[ch], axis=0).astype(np.float32)
+        if deltas[ch]:
+            arrays[f"delta_{ch}"] = np.stack(deltas[ch], axis=0).astype(np.float32)
         if example_obs[ch]:
             arrays[f"example_{ch}"] = np.stack(example_obs[ch], axis=0).astype(np.float32)
+
     if example_meta:
         arrays["example_meta"] = np.array(example_meta, dtype=object)
 
     out = Path(args.out)
     ensure_dir(out.parent)
     np.savez_compressed(out, **arrays)
-    print(f"Wrote {out} with {n} state-action samples and channels={channels}")
+    print(
+        f"Wrote {out} with {n} state-action samples, "
+        f"delta_samples={int(delta_keep.sum())}, channels={channels}"
+    )
 
 
 if __name__ == "__main__":

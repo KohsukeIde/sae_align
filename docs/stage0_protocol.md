@@ -48,10 +48,13 @@ Main strata are representation-independent.
 
 Proceed if:
 
-- main channels have distinct blind loci;
-- RGB+edge and RGB+noisy-RGB behave as low-complementarity controls;
+- trainable sensor-like channels have distinct blind loci;
+- RGB plus `noisy_rgb`, `gray_rgb`, and `blur_rgb` behaves as low-complementarity / high-redundancy controls;
+- `edge` is reported as a derived diagnostic channel, not as a primary redundancy control;
+- `event_response` is reported as diagnostic-only and excluded from primary Stage B unless explicitly run as an `--allow-leakage-diagnostic` leakage diagnostic;
 - semantic grid behaves like a privileged diagnostic channel;
 - the hierarchy is stable under K-sweep and threshold-sweep;
+- action-type reports do not show a single action family dominating the result;
 - non-redundant channels are not easily predicted from RGB in the redundancy probe.
 
 ## No-go conditions
@@ -59,8 +62,8 @@ Proceed if:
 Stop if:
 
 - all main blind loci are nearly identical;
-- edge or noisy-RGB produces high complementarity or high fusion gain;
-- global event channel leaks the downstream target;
+- RGB-derived redundancy controls fail to behave redundantly;
+- `event_response` is accidentally treated as a default Stage B trainable channel or future model input;
+- primary Stage B conclusions rely on `event_response` leakage-diagnostic runs;
 - conclusions disappear under small threshold changes;
-- range/local/event responses are trivially predictable from RGB.
-
+- range/local responses are trivially predictable from RGB.

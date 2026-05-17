@@ -18,9 +18,9 @@ Recommended proxies:
 
 Report AUROC, AUPRC, IoU/Jaccard, best-F1, and threshold curves against oracle strata.
 
-## Add Stage B: stratified action-effect kNN
+## Extend Stage B: regular/blind pairwise and stratified action-effect kNN
 
-Create:
+The current NumPy Stage B pilot already provides:
 
 ```text
 scripts/train_transition_encoder.py
@@ -29,7 +29,15 @@ src/sae_align/models/encoders.py
 src/sae_align/analysis/knn_alignment.py
 ```
 
-Main control: strata must be defined using `x_star` and `o_m`, not representation deltas.
+Primary Stage B evidence is the regular/blind pairwise alignment report over default trainable channels. Keep `event_response` excluded because it is a post-action diagnostic response channel. Only include it in separately labeled leakage diagnostics with `--allow-leakage-diagnostic`.
+
+Required controls:
+
+- action-only controls;
+- shuffled-strata controls;
+- shuffled-action controls.
+
+Main control: strata must be defined using `x_star` and `o_m`, not representation deltas. Current Stage 0/B pilots are NumPy-only and do not require qsub, a GPU, or CUDA.
 
 ## Add Stage C: selective prediction
 
@@ -55,4 +63,3 @@ Minimal baselines:
 ## Add external benchmark
 
 Do this only after Stage A/B/C signals are positive. Start with an offline Distracting Control Suite subset and proxy-only weighting.
-

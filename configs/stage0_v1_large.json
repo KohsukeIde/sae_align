@@ -1,0 +1,30 @@
+{
+  "seed": 0,
+  "grid_size": 32,
+  "n_states": 1000,
+  "k_actions": 128,
+  "horizon": 3,
+  "channels": [
+    "rgb",
+    "range",
+    "local",
+    "event_response",
+    "semantic",
+    "edge",
+    "noisy_rgb",
+    "gray_rgb",
+    "blur_rgb"
+  ],
+  "notes": {
+    "purpose": "Larger Stage 0 run after the smoke test.",
+    "main_channels": ["rgb", "range", "local"],
+    "diagnostic_only_channels": ["event_response"],
+    "control_channels": ["semantic", "edge", "noisy_rgb", "gray_rgb", "blur_rgb"],
+    "primary_redundancy_controls": ["noisy_rgb", "gray_rgb", "blur_rgb"],
+    "derived_diagnostics": ["edge"]
+  },
+  "stageb_default_channels": ["rgb", "range", "local"],
+  "diagnostic_only_channels": ["event_response"],
+  "max_delta_samples": 8000,
+  "max_delta_bytes": 1000000000
+}

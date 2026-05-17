@@ -1,8 +1,8 @@
 {
   "seed": 0,
   "grid_size": 32,
-  "n_states": 256,
-  "k_actions": 32,
+  "n_states": 1000,
+  "k_actions": 128,
   "horizon": 3,
   "channels": [
     "rgb",
@@ -42,7 +42,7 @@
     "privileged_controls": [
       "semantic"
     ],
-    "stage0_goal": "Verify non-redundant blind loci before representation-alignment or world-model training experiments."
+    "stage0_goal": "Larger Stage 0 run after smoke-test validation."
   },
   "stageb_default_channels": [
     "rgb",
@@ -52,6 +52,6 @@
   "diagnostic_only_channels": [
     "event_response"
   ],
-  "max_delta_samples": 2048,
+  "max_delta_samples": 8000,
   "max_delta_bytes": 1000000000
 }

@@ -7,7 +7,7 @@ first diagnostic phase:
 - deterministic local dynamics;
 - intervention action bank;
 - no-op vs do-action counterfactual rollouts;
-- sensor-like observation channels with distinct blind loci.
+- observation channels with distinct action-effect blind loci.
 
 It is not a faithful reimplementation of the original Powderworld environment.
 Use it to debug the Stage 0 protocol before swapping in the real simulator via
@@ -17,7 +17,7 @@ Use it to debug the Stage 0 protocol before swapping in the real simulator via
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Tuple
+from typing import List, Tuple
 
 import numpy as np
 
@@ -57,6 +57,11 @@ EVENT_NAMES = [
 ]
 EVENT_INDEX = {name: i for i, name in enumerate(EVENT_NAMES)}
 
+# Only these are exposed by the Stage-0 event-response channel. Direct
+# intervention events are intentionally excluded to reduce action leakage.
+PHYSICS_EVENT_NAMES = EVENT_NAMES[:5]
+PHYSICS_EVENT_COUNT = len(PHYSICS_EVENT_NAMES)
+
 
 @dataclass(frozen=True)
 class Action:
@@ -65,7 +70,7 @@ class Action:
     action_type:
         One of ``place``, ``erase``, ``push``, or ``noop``.
     x, y:
-        Grid coordinate.  Stored as x-column, y-row.
+        Grid coordinate. Stored as x-column, y-row.
     element:
         Element to place for ``place`` actions.
     dx, dy:
@@ -96,22 +101,16 @@ class ToyPowderWorld:
         self.grid_size = int(grid_size)
         self.rng = np.random.default_rng(seed)
 
-    # ---------------------------------------------------------------------
-    # State generation and actions
-    # ---------------------------------------------------------------------
     def sample_state(self) -> np.ndarray:
         """Sample a random grid state."""
         h = w = self.grid_size
         grid = np.zeros((h, w), dtype=np.int16)
 
-        # Boundary walls.
         grid[0, :] = WALL
         grid[-1, :] = WALL
         grid[:, 0] = WALL
         grid[:, -1] = WALL
 
-        # Random blobs for elements.  The probabilities are intentionally
-        # sparse to leave room for dynamics.
         probs = [
             (WALL, 0.025),
             (SAND, 0.070),
@@ -125,20 +124,13 @@ class ToyPowderWorld:
         for elem, p in probs:
             mask = self.rng.random((h - 2, w - 2)) < p
             sub = grid[inner]
-            # Later elements only fill empty cells, preventing total collapse
-            # into dense clutter.
             sub[(sub == EMPTY) & mask] = elem
             grid[inner] = sub
 
         return grid
 
     def make_action_bank(self, k: int = 128) -> List[Action]:
-        """Create a fixed intervention bank.
-
-        The bank is deliberately mixed across local placement, deletion, and
-        push-like perturbations.  Downstream analyses should use K-sweeps over
-        subsets of this bank to check action-sampling stability.
-        """
+        """Create a fixed intervention bank."""
         actions: List[Action] = []
         h = w = self.grid_size
         place_elems = [SAND, WATER, FIRE, WOOD, METAL, GLASS]
@@ -158,9 +150,6 @@ class ToyPowderWorld:
                 actions.append(Action("push", x=x, y=y, dx=dx, dy=dy))
         return actions
 
-    # ---------------------------------------------------------------------
-    # Dynamics
-    # ---------------------------------------------------------------------
     def apply_action(self, grid: np.ndarray, action: Action) -> Tuple[np.ndarray, np.ndarray]:
         grid = grid.copy()
         events = np.zeros(len(EVENT_NAMES), dtype=np.float32)
@@ -193,7 +182,6 @@ class ToyPowderWorld:
         h, w = g.shape
         events = np.zeros(len(EVENT_NAMES), dtype=np.float32)
 
-        # Fire interactions.
         new_g = g.copy()
         for y in range(1, h - 1):
             for x in range(1, w - 1):
@@ -209,14 +197,12 @@ class ToyPowderWorld:
                         events[EVENT_INDEX["fire_wood"]] += 1.0
         g = new_g
 
-        # Sand falls downward.  Iterate bottom-up for simple stability.
         for y in range(h - 2, 0, -1):
             for x in range(1, w - 1):
                 if g[y, x] == SAND and g[y + 1, x] in (EMPTY, WATER):
                     g[y + 1, x], g[y, x] = g[y, x], g[y + 1, x]
                     events[EVENT_INDEX["sand_fall"]] += 1.0
 
-        # Water flows down, otherwise sideways deterministically depending on x.
         for y in range(h - 2, 0, -1):
             for x in range(1, w - 1):
                 if g[y, x] != WATER:
@@ -230,7 +216,6 @@ class ToyPowderWorld:
                         g[y, x + direction], g[y, x] = WATER, EMPTY
                         events[EVENT_INDEX["water_flow"]] += 1.0
 
-        # Smoke rises and sometimes disappears.
         for y in range(1, h - 1):
             for x in range(1, w - 1):
                 if g[y, x] == SMOKE:
@@ -251,21 +236,17 @@ class ToyPowderWorld:
         return RolloutResult(final_grid=g, event_counts=total_events)
 
 
-# -------------------------------------------------------------------------
-# Observation channels
-# -------------------------------------------------------------------------
-
 RGB_COLORS = np.array(
     [
-        [0.02, 0.02, 0.02],  # empty
-        [0.35, 0.35, 0.35],  # wall
-        [0.78, 0.70, 0.45],  # sand
-        [0.05, 0.20, 0.85],  # water
-        [1.00, 0.25, 0.05],  # fire
-        [0.35, 0.18, 0.05],  # wood
-        [0.65, 0.65, 0.70],  # metal
-        [0.06, 0.08, 0.10],  # glass intentionally close to empty => RGB blind
-        [0.45, 0.45, 0.48],  # smoke
+        [0.02, 0.02, 0.02],
+        [0.35, 0.35, 0.35],
+        [0.78, 0.70, 0.45],
+        [0.05, 0.20, 0.85],
+        [1.00, 0.25, 0.05],
+        [0.35, 0.18, 0.05],
+        [0.65, 0.65, 0.70],
+        [0.06, 0.08, 0.10],
+        [0.45, 0.45, 0.48],
     ],
     dtype=np.float32,
 )
@@ -277,13 +258,32 @@ SOLIDITY = np.array([0.0, 1.0, 0.30, 0.0, 0.0, 0.70, 1.0, 0.40, 0.0], dtype=np.f
 
 
 def render_rgb(grid: np.ndarray, noise_std: float = 0.0, seed: int | None = None) -> np.ndarray:
-    img = RGB_COLORS[grid]
-    # Return CHW.
-    img = np.moveaxis(img, -1, 0).astype(np.float32)
+    img = np.moveaxis(RGB_COLORS[grid], -1, 0).astype(np.float32)
     if noise_std > 0:
         rng = np.random.default_rng(seed)
         img = np.clip(img + rng.normal(0, noise_std, img.shape).astype(np.float32), 0.0, 1.0)
     return img
+
+
+def render_gray_rgb(grid: np.ndarray) -> np.ndarray:
+    """Linear RGB-derived grayscale redundancy control."""
+    rgb = render_rgb(grid)
+    gray = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]
+    return gray[None, :, :].astype(np.float32)
+
+
+def _mean_blur_chw(x: np.ndarray) -> np.ndarray:
+    pad = np.pad(x, ((0, 0), (1, 1), (1, 1)), mode="edge")
+    out = np.zeros_like(x, dtype=np.float32)
+    for dy in range(3):
+        for dx in range(3):
+            out += pad[:, dy : dy + x.shape[1], dx : dx + x.shape[2]]
+    return out / 9.0
+
+
+def render_blur_rgb(grid: np.ndarray) -> np.ndarray:
+    """RGB-derived blurred redundancy control."""
+    return _mean_blur_chw(render_rgb(grid)).astype(np.float32)
 
 
 def render_semantic(grid: np.ndarray) -> np.ndarray:
@@ -291,28 +291,23 @@ def render_semantic(grid: np.ndarray) -> np.ndarray:
 
 
 def render_edge(grid: np.ndarray) -> np.ndarray:
-    # Derived view from semantic/RGB boundaries.  This is deliberately a
-    # negative control rather than a main modality.
+    """Boundary-derived diagnostic channel.
+
+    This deterministic derived view isolates boundary changes rather than RGB
+    color changes. It is therefore not the primary redundancy control.
+    """
     edge = np.zeros_like(grid, dtype=np.float32)
     edge[:, 1:] += grid[:, 1:] != grid[:, :-1]
     edge[1:, :] += grid[1:, :] != grid[:-1, :]
-    edge = np.clip(edge, 0.0, 1.0)
-    return edge[None, :, :]
+    return np.clip(edge, 0.0, 1.0)[None, :, :]
 
 
 def render_range_like(grid: np.ndarray) -> np.ndarray:
-    """Four directional ranges to blockers.
-
-    Glass is intentionally treated as transparent to this range-like channel,
-    producing a blind locus distinct from RGB.  The implementation uses linear
-    scans rather than per-pixel ray marching so Stage 0 remains fast.
-    """
     h, w = grid.shape
-    blockers = np.isin(grid, [WALL, WOOD, METAL])  # GLASS is not a range blocker.
+    blockers = np.isin(grid, [WALL, WOOD, METAL])
     out = np.zeros((4, h, w), dtype=np.float32)
     maxdist = float(max(h, w))
 
-    # up distance
     for x in range(w):
         last = -1
         for y in range(h):
@@ -321,7 +316,7 @@ def render_range_like(grid: np.ndarray) -> np.ndarray:
                 out[0, y, x] = 0.0
             else:
                 out[0, y, x] = (y - last) / maxdist
-    # down distance
+
     for x in range(w):
         last = h
         for y in range(h - 1, -1, -1):
@@ -330,7 +325,7 @@ def render_range_like(grid: np.ndarray) -> np.ndarray:
                 out[1, y, x] = 0.0
             else:
                 out[1, y, x] = (last - y) / maxdist
-    # left distance
+
     for y in range(h):
         last = -1
         for x in range(w):
@@ -339,7 +334,7 @@ def render_range_like(grid: np.ndarray) -> np.ndarray:
                 out[2, y, x] = 0.0
             else:
                 out[2, y, x] = (x - last) / maxdist
-    # right distance
+
     for y in range(h):
         last = w
         for x in range(w - 1, -1, -1):
@@ -353,36 +348,25 @@ def render_range_like(grid: np.ndarray) -> np.ndarray:
 
 
 def render_local_interaction(grid: np.ndarray, action: Action, radius: int = 3) -> np.ndarray:
-    """Agent/action-centric local material response channel.
-
-    The channel is local around the action site.  It is not a global visual
-    rendering.  This gives it blind loci distinct from RGB/range channels.
-    """
-    patch_size = 2 * radius + 1
     y0, x0 = int(action.y), int(action.x)
     padded = np.pad(grid, radius, mode="constant", constant_values=WALL)
     y = y0 + radius
     x = x0 + radius
     patch = padded[y - radius : y + radius + 1, x - radius : x + radius + 1]
-    props = np.stack(
-        [
-            HARDNESS[patch],
-            TEMPERATURE[patch],
-            FLUIDITY[patch],
-            SOLIDITY[patch],
-        ],
+    return np.stack(
+        [HARDNESS[patch], TEMPERATURE[patch], FLUIDITY[patch], SOLIDITY[patch]],
         axis=0,
     ).astype(np.float32)
-    return props
 
 
-def render_global_event(event_counts: np.ndarray) -> np.ndarray:
-    # Spatially marginalized event-statistics channel.  This is not called
-    # audio and intentionally contains no spatial location.  Direct intervention
-    # events (place/erase/push) are excluded to avoid leaking the chosen action;
-    # the channel only reports endogenous interaction events.
-    physics_event_count = 5  # fire_water, fire_wood, sand_fall, water_flow, smoke_rise
-    return event_counts[:physics_event_count].astype(np.float32)
+def render_event_response(event_counts: np.ndarray) -> np.ndarray:
+    """Spatially marginalized post-action endogenous event response.
+
+    This is a Stage-0 diagnostic response channel. It should not be used as a
+    future world-model input without redesigning it into a pre-action event
+    history channel.
+    """
+    return event_counts[:PHYSICS_EVENT_COUNT].astype(np.float32)
 
 
 def render_channel(
@@ -396,16 +380,20 @@ def render_channel(
         return render_rgb(grid, noise_std=0.0)
     if channel == "noisy_rgb":
         return render_rgb(grid, noise_std=0.05, seed=noise_seed)
+    if channel == "gray_rgb":
+        return render_gray_rgb(grid)
+    if channel == "blur_rgb":
+        return render_blur_rgb(grid)
     if channel == "range":
         return render_range_like(grid)
     if channel == "local":
         if action is None:
             raise ValueError("local channel requires an action")
         return render_local_interaction(grid, action)
-    if channel == "event":
+    if channel in {"event", "event_response"}:
         if event_counts is None:
-            raise ValueError("event channel requires event_counts")
-        return render_global_event(event_counts)
+            raise ValueError("event_response channel requires event_counts")
+        return render_event_response(event_counts)
     if channel == "semantic":
         return render_semantic(grid)
     if channel == "edge":
@@ -413,7 +401,16 @@ def render_channel(
     raise KeyError(f"Unknown channel: {channel}")
 
 
-DEFAULT_CHANNELS = ["rgb", "range", "local", "event", "semantic", "edge", "noisy_rgb"]
-MAIN_CHANNELS = ["rgb", "range", "local", "event"]
-CONTROL_CHANNELS = ["semantic", "edge", "noisy_rgb"]
-
+DEFAULT_CHANNELS = [
+    "rgb",
+    "range",
+    "local",
+    "event_response",
+    "semantic",
+    "edge",
+    "noisy_rgb",
+    "gray_rgb",
+    "blur_rgb",
+]
+MAIN_CHANNELS = ["rgb", "range", "local", "event_response"]
+CONTROL_CHANNELS = ["semantic", "edge", "noisy_rgb", "gray_rgb", "blur_rgb"]
