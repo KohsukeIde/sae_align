@@ -1,0 +1,13 @@
+{
+  "seed": 0,
+  "grid_size": 32,
+  "n_states": 256,
+  "k_actions": 32,
+  "horizon": 3,
+  "channels": ["rgb", "range", "local", "event", "semantic", "edge", "noisy_rgb"],
+  "notes": {
+    "main_channels": ["rgb", "range", "local", "event"],
+    "control_channels": ["semantic", "edge", "noisy_rgb"],
+    "stage0_goal": "Verify non-redundant blind loci before any representation-alignment or world-model training experiment."
+  }
+}
