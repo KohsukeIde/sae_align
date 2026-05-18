@@ -317,6 +317,7 @@ def test_state_signature_knn_script_writes_stageb2_reports(tmp_path):
                 "--train-action-ids",
                 "0",
                 "1",
+                "2",
                 *extra,
             ],
             check=True,
@@ -345,6 +346,7 @@ def test_state_signature_knn_script_writes_stageb2_reports(tmp_path):
             "--probe-action-ids",
             "0",
             "1",
+            "2",
             "--bootstrap-repeats",
             "10",
             "--bootstrap-seed",
@@ -363,9 +365,80 @@ def test_state_signature_knn_script_writes_stageb2_reports(tmp_path):
     assert (out / "reports" / "diagnostic_probe_delta_minus_static_gain.csv").exists()
     summary = json.loads((out / "reports" / "stageb2_state_signature_summary.json").read_text())
     assert summary["n_states"] == 5
-    assert len(summary["probe_action_ids"]) == 2
-    assert len(summary["heldout_action_ids"]) == 2
+    assert len(summary["probe_action_ids"]) == 3
+    assert len(summary["heldout_action_ids"]) == 1
     assert summary["encoder_action_split"] == "probe_only"
     assert summary["bootstrap_repeats"] == 10
     assert summary["controls"]["probe_to_heldout_cross"]
     assert summary["controls"]["action_column_shuffled"]
+
+    split_out = tmp_path / "stageb3_split"
+    subprocess.run(
+        [
+            sys.executable,
+            "scripts/make_balanced_action_split.py",
+            "--data",
+            str(data_path),
+            "--out",
+            str(split_out),
+            "--n-candidates",
+            "20",
+            "--seed",
+            "3",
+        ],
+        check=True,
+        env=env,
+    )
+    assert (split_out / "probe_action_ids.txt").exists()
+    assert (split_out / "action_split_balance.csv").exists()
+
+    b3_out = tmp_path / "stageb3"
+    subprocess.run(
+        [
+            sys.executable,
+            "scripts/analyze_stageb3_gates.py",
+            "--data",
+            str(data_path),
+            "--model",
+            str(action_model_dir / "transition_encoders.npz"),
+            "--static-model",
+            str(static_model_dir / "transition_encoders.npz"),
+            "--out",
+            str(b3_out),
+            "--channels",
+            "rgb",
+            "range",
+            "local",
+            "--probe-action-ids",
+            "0",
+            "1",
+            "2",
+            "--k",
+            "2",
+            "--max-states",
+            "5",
+            "--bootstrap-repeats",
+            "5",
+            "--normalization-modes",
+            "none",
+            "probe_global_apply",
+            "probe_action_type_apply",
+        ],
+        check=True,
+        env=env,
+    )
+    assert (b3_out / "reports" / "normalization_sweep_knn.csv").exists()
+    assert (b3_out / "reports" / "normalization_sweep_bootstrap_ci.csv").exists()
+    assert (b3_out / "reports" / "observability_score_vs_overlap.csv").exists()
+    assert (b3_out / "reports" / "gate_summary.csv").exists()
+    with open(b3_out / "reports" / "normalization_sweep_knn.csv") as f:
+        b3_rows = f.read()
+    assert "static_heldout_signature" in b3_rows
+    assert "action_column_shuffled_heldout" in b3_rows
+    assert "probe_action_type_apply" in b3_rows
+    b3_summary = json.loads((b3_out / "reports" / "stageb3_summary.json").read_text())
+    assert b3_summary["primary_normalization_modes"] == [
+        "none",
+        "probe_action_type_apply",
+        "probe_global_apply",
+    ]

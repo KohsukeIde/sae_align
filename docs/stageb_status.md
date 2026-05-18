@@ -132,6 +132,19 @@ Bootstrap/fraction follow-up:
 - `rgb-range` `regular_both_fraction` has q90 `0.25` and max `0.3125`, so
   fixed `0.60` regular-state thresholds are not viable for this run.
 
+## Stage B.3 Gate
+
+Stage B.3 is preregistered in `docs/stageb3_preregistration.md`. It is a
+framing-decision gate, not a Stage C experiment. The key change from B.2 is that
+redundancy probe-to-heldout calibration and non-transductive normalization must
+pass before interpreting `rgb-range`. Held-out action-effect is compared to
+held-out static and held-out shuffled controls, not probe-action controls.
+
+The first B.3 v1 CPU run is recorded in `docs/stageb3_v1_cpu_experiment.md`.
+It is diagnostic-only: redundancy cross-action calibration did not reliably pass
+under the bootstrap CI criterion, so Stage C remains blocked and neither Option
+2.5 nor Option 3 is promoted yet.
+
 ## Reproducible Smoke
 
 Run:

@@ -81,6 +81,17 @@ negative/weak decision, not as a pass. Before moving to Stage C, repair the
 state-stratum policy, make probe-to-heldout transfer the primary pass metric,
 and require redundancy controls to pass that cross-action transfer check.
 
+Stage B.3 formalizes that repair as a framing-decision gate. Read
+`docs/stageb3_preregistration.md` first, then use:
+
+```bash
+PYTHONPATH=src bash scripts/run_stageb_b3_smoke.sh outputs/stageb_b3_smoke
+```
+
+The B.3 reports test balanced action splits, non-transductive normalization,
+held-out static/shuffled controls, redundancy probe-to-heldout calibration, and
+continuous observability scores.
+
 ## Add Stage C: selective prediction
 
 Stage C is still too early. Add selective-prediction baselines only after Stage

@@ -183,6 +183,7 @@ def channel_blind_masks(
     sample_indices: np.ndarray,
     *,
     threshold_quantile: float = 0.10,
+    threshold_sample_indices: np.ndarray | None = None,
 ) -> tuple[np.ndarray, dict[str, np.ndarray], dict[str, np.ndarray], dict[str, float]]:
     """Compute dense-subset physical, blind, and regular masks per channel.
 
@@ -190,8 +191,11 @@ def channel_blind_masks(
     detectability only. Embeddings are intentionally not used.
     """
     sample_indices = np.asarray(sample_indices, dtype=np.int64)
+    if threshold_sample_indices is not None:
+        threshold_sample_indices = np.asarray(threshold_sample_indices, dtype=np.int64)
     world_full = np.asarray(data["world_delta"], dtype=np.float32)
-    eps_x = max(float(np.quantile(world_full, float(threshold_quantile))), 1e-8)
+    world_threshold_base = world_full if threshold_sample_indices is None else world_full[threshold_sample_indices]
+    eps_x = max(float(np.quantile(world_threshold_base, float(threshold_quantile))), 1e-8)
     physical_full = world_full >= eps_x
     physical = physical_full[sample_indices]
     blind: dict[str, np.ndarray] = {}
@@ -199,7 +203,9 @@ def channel_blind_masks(
     thresholds: dict[str, float] = {"world": eps_x}
     for ch in channels:
         det_full = np.asarray(data[f"detect_{ch}"], dtype=np.float32)
-        base = det_full[physical_full]
+        base_mask = physical_full if threshold_sample_indices is None else physical_full[threshold_sample_indices]
+        base_values = det_full if threshold_sample_indices is None else det_full[threshold_sample_indices]
+        base = base_values[base_mask]
         tau = max(float(np.quantile(base, float(threshold_quantile))) if base.size else 1e-8, 1e-8)
         det = det_full[sample_indices]
         blind[ch] = np.logical_and(physical, det <= tau)

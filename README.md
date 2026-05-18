@@ -214,3 +214,13 @@ A larger local CPU Stage B.2 v1 run is recorded in
 `docs/stageb2_v1_cpu_experiment.md`. That run is an experiment, not only an
 implementation check, and it does not pass the current Stage B.2 scientific
 gate. Stage C remains blocked.
+
+For the Stage B.3 framing-decision gate:
+
+```bash
+PYTHONPATH=src bash scripts/run_stageb_b3_smoke.sh outputs/stageb_b3_smoke
+```
+
+Read `docs/stageb3_preregistration.md` before interpreting the result. B.3 is
+designed to decide between metric repair, continuous observability, and
+action-coupling framing; it is not a Stage C experiment.

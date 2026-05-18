@@ -119,7 +119,10 @@ def complete_state_action_matrix(
         if state_ids is not None
         else np.asarray(sorted(np.unique(full_state).tolist()), dtype=np.int64)
     )
-    row_for = {(int(s), int(a)): i for i, (s, a) in enumerate(zip(full_state.tolist(), full_action.tolist()))}
+    pairs = [(int(s), int(a)) for s, a in zip(full_state.tolist(), full_action.tolist())]
+    if len(set(pairs)) != len(pairs):
+        raise ValueError("Dense Stage 0 data contains duplicate (state_id, action_id) rows.")
+    row_for = {pair: i for i, pair in enumerate(pairs)}
     complete_states = []
     for state in candidate_states.tolist():
         if all((int(state), int(action)) in row_for for action in required_actions.tolist()):
@@ -301,6 +304,7 @@ def state_pair_strata(
         channels,
         sample_indices,
         threshold_quantile=detectability_quantile,
+        threshold_sample_indices=full_rows[:, action_positions].reshape(-1),
     )
     n_states, n_actions = full_rows.shape
     physical_m = physical.reshape(n_states, n_actions)[:, action_positions]
@@ -359,12 +363,15 @@ def cross_split_rows(
         for b in channels[i + 1 :]:
             for stratum, mask in pair_strata[(a, b)].items():
                 mask = np.asarray(mask, dtype=bool)
-                ab = neighbor_overlap_stats(probe_neighbors[a], test_neighbors[b], k=k, query_mask=mask)
-                ba = neighbor_overlap_stats(probe_neighbors[b], test_neighbors[a], k=k, query_mask=mask)
-                vals = [float(ab["overlap"]), float(ba["overlap"])]
-                overlap = float(np.nanmean(vals)) if np.isfinite(vals).any() else float("nan")
-                effective = [float(ab["mean_effective_k"]), float(ba["mean_effective_k"])]
-                mean_effective_k = float(np.nanmean(effective)) if np.isfinite(effective).any() else float("nan")
+                scores = symmetric_query_overlap_scores(
+                    probe_neighbors[a],
+                    test_neighbors[b],
+                    probe_neighbors[b],
+                    test_neighbors[a],
+                    k=k,
+                    query_mask=mask,
+                )
+                overlap = float(np.mean(scores)) if scores.size else float("nan")
                 rows.append(
                     {
                         "control": control,
@@ -372,8 +379,8 @@ def cross_split_rows(
                         "channel_b": b,
                         "stratum": stratum,
                         "n_queries": int(mask.sum()),
-                        "n_valid_queries": int(min(int(ab["n_valid_queries"]), int(ba["n_valid_queries"]))),
-                        "mean_effective_k": mean_effective_k,
+                        "n_valid_queries": int(scores.size),
+                        "mean_effective_k": float(kk) if scores.size else float("nan"),
                         "overlap": overlap,
                         "random_expected_overlap": chance,
                         "chance_adjusted_overlap": overlap - chance if np.isfinite(overlap) else float("nan"),
@@ -786,7 +793,12 @@ def main() -> None:
             allow_cross_data_model=bool(args.allow_cross_data_model),
         )
         static_dense_rows = dense_rows_for_sample_ids(static_sample_indices, full_rows)
-        static_features = signature_features(
+        validate_probe_trained_model(
+            static_metadata,
+            probe_action_ids,
+            allow_all_action_trained_model=bool(args.allow_all_action_trained_model),
+        )
+        static_probe_features = signature_features(
             data,
             static_encoders,
             channels,
@@ -797,16 +809,37 @@ def main() -> None:
             shuffle_columns=False,
             seed=int(args.seed) + 201,
         )
-        static_neighbors = neighbor_sets(static_features, k=int(args.k), batch_size=int(args.batch_size))
-        static_rows = pairwise_stratified_overlap_rows(
-            static_neighbors,
+        static_test_features = signature_features(
+            data,
+            static_encoders,
+            channels,
+            prefix="obs0",
+            dense_rows=static_dense_rows,
+            action_positions=test_pos,
+            normalize_per_action=normalize,
+            shuffle_columns=False,
+            seed=int(args.seed) + 202,
+        )
+        static_probe_neighbors = neighbor_sets(static_probe_features, k=int(args.k), batch_size=int(args.batch_size))
+        static_test_neighbors = neighbor_sets(static_test_features, k=int(args.k), batch_size=int(args.batch_size))
+        static_probe_rows = pairwise_stratified_overlap_rows(
+            static_probe_neighbors,
             pair_strata,
             k=int(args.k),
             control="static_probe_signature",
         )
+        static_rows = pairwise_stratified_overlap_rows(
+            static_test_neighbors,
+            pair_strata,
+            k=int(args.k),
+            control="static_heldout_signature",
+        )
         bootstrap_ci_rows.extend(
             bootstrap_rows(
-                {"static_probe_signature": static_neighbors},
+                {
+                    "static_probe_signature": static_probe_neighbors,
+                    "static_heldout_signature": static_test_neighbors,
+                },
                 pair_strata,
                 k=int(args.k),
                 repeats=int(args.bootstrap_repeats),
@@ -814,8 +847,8 @@ def main() -> None:
             )
         )
         gain_rows = static_gain_rows(test_rows, static_rows)
-        diagnostic_probe_gain_rows = static_gain_rows(probe_rows, static_rows)
-        all_rows.extend(static_rows)
+        diagnostic_probe_gain_rows = static_gain_rows(probe_rows, static_probe_rows)
+        all_rows.extend(static_probe_rows + static_rows)
 
     out = ensure_dir(args.out)
     report_dir = ensure_dir(out / "reports")
@@ -855,13 +888,19 @@ def main() -> None:
             "per_action_normalize": normalize,
             "strata_thresholds": thresholds,
             "primary_controls": ["action_effect_heldout_signature", "probe_to_heldout_cross"],
-            "diagnostic_controls": ["action_effect_probe_signature", "action_column_shuffled", "static_probe_signature"],
+            "diagnostic_controls": [
+                "action_effect_probe_signature",
+                "action_column_shuffled",
+                "static_probe_signature",
+                "static_heldout_signature",
+            ],
             "controls": {
                 "action_effect_probe_signature": True,
                 "action_effect_heldout_signature": True,
                 "probe_to_heldout_cross": True,
                 "action_column_shuffled": True,
                 "static_probe_signature": bool(static_rows),
+                "static_heldout_signature": bool(static_rows),
             },
         },
         report_dir / "stageb2_state_signature_summary.json",
