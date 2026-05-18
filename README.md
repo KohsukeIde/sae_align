@@ -12,7 +12,7 @@ The goal of this first phase is *not* to train a full world model or reproduce D
 4. Derived diagnostics such as edge maps are interpreted separately from redundancy controls.
 5. We can later use these strata for stratified action-effect alignment and selective prediction.
 
-The repository is designed to be extended incrementally. Stage 0 is implemented, and the first NumPy Stage B action-effect kNN pipeline is available for pilot diagnostics. Current Stage 0/B pilots are NumPy-only and do not require qsub, a GPU, or CUDA.
+The repository is designed to be extended incrementally. Stage 0 is implemented, and the first NumPy Stage B action-effect kNN pipeline is available for pilot diagnostics. Current Stage 0/B pilots are NumPy-only CPU runs and do not require qsub, a GPU, or CUDA. Stage C is still too early; the next priority is Stage B.2 state-level action-effect signature alignment.
 
 ---
 
@@ -52,6 +52,8 @@ Implemented now:
 - K-sweep and threshold-sweep support;
 - stage reports and plots;
 - NumPy Stage B transition encoders and regular/blind pairwise kNN alignment reports.
+- Stage B.1 confound-control smoke reports for action-restricted, action-residualized, and static-vs-action-effect comparisons;
+- Stage B.2 state-level action-effect signature smoke/pilot reports with full-state dense sampling, probe-action encoder training, held-out action scoring, and static baselines.
 
 Not implemented yet:
 
@@ -192,3 +194,23 @@ PYTHONPATH=src bash scripts/run_stageb_b1_smoke.sh outputs/stageb_b1_smoke
 This adds same-action-type, same-action-id, action-residualized, and
 static-vs-action-effect reports. See `docs/stageb_status.md` for the current
 interpretation and remaining Stage B loopholes.
+
+The current priority remains Stage B.2 hardening: estimate a state-level
+action-effect signature `D_m(s)` from probe actions, label `regular_state` /
+`blind_state` at the state level, and score alignment on held-out test actions.
+Do this before Stage C selective prediction or world-model baselines.
+
+For a minimal Stage B.2 smoke run:
+
+```bash
+PYTHONPATH=src bash scripts/run_stageb_b2_smoke.sh outputs/stageb_b2_smoke
+```
+
+This uses `--dense-sampling full-states` so each selected state has the full
+action bank needed to form `D_m(s)`. It also trains the action-effect encoder
+only on the probe action IDs before evaluating held-out action signatures.
+
+A larger local CPU Stage B.2 v1 run is recorded in
+`docs/stageb2_v1_cpu_experiment.md`. That run is an experiment, not only an
+implementation check, and it does not pass the current Stage B.2 scientific
+gate. Stage C remains blocked.

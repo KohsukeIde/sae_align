@@ -17,7 +17,12 @@ from typing import Dict
 import numpy as np
 
 from sae_align.models import StandardizedPCAEncoder, default_stageb_channels, save_transition_encoders
-from sae_align.analysis.strata import diagnostic_only_channels, validate_dense_stage0_data, validate_dense_static_data
+from sae_align.analysis.strata import (
+    diagnostic_only_channels,
+    stage0_dataset_fingerprint,
+    validate_dense_stage0_data,
+    validate_dense_static_data,
+)
 from sae_align.utils.io import ensure_dir, save_json
 
 
@@ -29,6 +34,13 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--n-components", type=int, default=32)
     p.add_argument("--max-train-samples", type=int, default=4000)
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument(
+        "--train-action-ids",
+        nargs="*",
+        type=int,
+        default=None,
+        help="Restrict encoder fitting rows to these action_id values while still transforming all dense rows.",
+    )
     p.add_argument(
         "--feature-kind",
         choices=["action-effect", "delta", "static", "obs0"],
@@ -67,6 +79,25 @@ def normalize_feature_kind(value: str) -> str:
 
 def feature_prefix(feature_kind: str) -> str:
     return "delta" if feature_kind == "action-effect" else "obs0"
+
+
+def action_filtered_train_indices(
+    data: Dict[str, np.ndarray],
+    sample_indices: np.ndarray,
+    train_idx: np.ndarray,
+    action_ids: list[int] | None,
+) -> np.ndarray:
+    if action_ids is None:
+        return train_idx
+    if "action_id" not in data:
+        raise KeyError("--train-action-ids requires action_id in the Stage 0 dataset.")
+    action_ids_arr = np.asarray(action_ids, dtype=np.int64)
+    full_action = np.asarray(data["action_id"], dtype=np.int64)[sample_indices]
+    keep = np.isin(full_action[train_idx], action_ids_arr)
+    filtered = train_idx[keep]
+    if filtered.shape[0] < 2:
+        raise ValueError("--train-action-ids left fewer than two dense rows for encoder fitting.")
+    return filtered
 
 
 def choose_channels(args: argparse.Namespace, data: Dict[str, np.ndarray]) -> list[str]:
@@ -112,8 +143,16 @@ def main() -> None:
         sample_indices = validate_dense_static_data(data, channels)
     n_dense = int(sample_indices.shape[0])
     train_idx = np.arange(n_dense)
-    if n_dense > int(args.max_train_samples):
-        train_idx = np.sort(rng.choice(n_dense, size=int(args.max_train_samples), replace=False))
+    train_idx = action_filtered_train_indices(data, sample_indices, train_idx, args.train_action_ids)
+    if train_idx.shape[0] > int(args.max_train_samples):
+        train_idx = np.sort(rng.choice(train_idx, size=int(args.max_train_samples), replace=False))
+    actual_train_action_ids = None
+    actual_train_action_counts = None
+    if "action_id" in data:
+        train_actions = np.asarray(data["action_id"], dtype=np.int64)[sample_indices][train_idx]
+        ids, counts = np.unique(train_actions, return_counts=True)
+        actual_train_action_ids = [int(x) for x in ids.tolist()]
+        actual_train_action_counts = {str(int(i)): int(c) for i, c in zip(ids.tolist(), counts.tolist())}
 
     encoders: Dict[str, StandardizedPCAEncoder] = {}
     embeddings: Dict[str, np.ndarray] = {
@@ -137,6 +176,10 @@ def main() -> None:
         "feature_prefix": prefix,
         "n_dense_samples": n_dense,
         "n_train_samples": int(train_idx.shape[0]),
+        "train_action_ids": [int(x) for x in args.train_action_ids] if args.train_action_ids is not None else None,
+        "actual_train_action_ids": actual_train_action_ids,
+        "actual_train_action_counts": actual_train_action_counts,
+        "stage0_fingerprint": stage0_dataset_fingerprint(data, channels, sample_indices, prefix=prefix),
         "n_components_requested": int(args.n_components),
         "seed": int(args.seed),
         "include_diagnostic": bool(args.include_diagnostic),

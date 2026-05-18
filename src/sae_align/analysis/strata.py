@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from typing import Dict, Mapping, Sequence
 
 import numpy as np
@@ -95,6 +96,45 @@ def validate_dense_static_data(data: Mapping[str, np.ndarray], channels: Sequenc
         if int(np.asarray(data[key]).shape[0]) != n_dense:
             raise ValueError(f"{key} row count does not match {first}.")
     return sample_indices
+
+
+def _fingerprint_array(hasher: "hashlib._Hash", value: np.ndarray) -> None:
+    arr = np.asarray(value)
+    hasher.update(str(arr.shape).encode("utf-8"))
+    hasher.update(str(arr.dtype).encode("utf-8"))
+    if arr.dtype == object:
+        hasher.update(repr(arr.tolist()).encode("utf-8"))
+    else:
+        hasher.update(np.ascontiguousarray(arr).view(np.uint8))
+
+
+def stage0_dataset_fingerprint(
+    data: Mapping[str, np.ndarray],
+    channels: Sequence[str],
+    sample_indices: np.ndarray,
+    *,
+    prefix: str,
+) -> str:
+    """Fingerprint the Stage 0 arrays used by a Stage B encoder/analysis."""
+    sample_indices = np.asarray(sample_indices, dtype=np.int64)
+    hasher = hashlib.sha256()
+    hasher.update(str(prefix).encode("utf-8"))
+    hasher.update("|".join(str(ch) for ch in channels).encode("utf-8"))
+    _fingerprint_array(hasher, sample_indices)
+    for key in ["world_delta", "state_id", "action_id", "grid_size", "horizon", "seed", "schema_version"]:
+        if key in data:
+            values = np.asarray(data[key])
+            if values.shape[:1] == sample_indices.shape[:1]:
+                _fingerprint_array(hasher, values)
+            elif values.ndim > 0 and sample_indices.size and values.shape[0] >= int(sample_indices.max()) + 1:
+                _fingerprint_array(hasher, values[sample_indices])
+            else:
+                _fingerprint_array(hasher, values)
+    for channel in channels:
+        for key in [f"{prefix}_{channel}", f"detect_{channel}"]:
+            if key in data:
+                _fingerprint_array(hasher, np.asarray(data[key]))
+    return hasher.hexdigest()
 
 
 def physical_nonnull_mask(world_delta: np.ndarray, q: float = 0.10) -> tuple[np.ndarray, float]:

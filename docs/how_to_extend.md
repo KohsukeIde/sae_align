@@ -42,13 +42,50 @@ Required controls:
 
 Main control: strata must be defined using `x_star` and `o_m`, not representation deltas. Current Stage 0/B pilots are NumPy-only and do not require qsub, a GPU, or CUDA.
 
-Stage B.1 is the immediate hardening step before Stage C. Use
+Stage B.1 is the immediate hardening step before Stage B.2. Use
 `scripts/run_stageb_b1_smoke.sh` for a CPU smoke run. Read restricted-kNN results
 through `chance_adjusted_overlap`, `n_valid_queries`, and `mean_effective_k`.
 Static comparisons should exclude same-state neighbors when `state_id` is
 available, because the same state appears once per action.
 
+Stage B.2 is the current hardening priority: state-level action-effect signature alignment.
+For each state `s`, estimate a state-level signature `D_m(s)` from probe actions
+and compare signatures across channels on held-out test actions. Define
+`regular_state` / `blind_state` strata at the state level, rather than treating
+each state-action row as an independent stratum member. The probe/test action
+split is required so the signature used to choose or describe a state is not
+evaluated on the same actions.
+
+Use `--dense-sampling full-states` when generating Stage 0 data for Stage B.2;
+random dense subsets are insufficient because `D_m(s)` requires all action
+columns for each retained state. The smoke command is:
+
+```bash
+PYTHONPATH=src bash scripts/run_stageb_b2_smoke.sh outputs/stageb_b2_smoke
+```
+
+For primary held-out action claims, train the action-effect encoder with the
+same probe action IDs used by `scripts/analyze_state_signature_knn.py`. The
+script fails by default when the encoder was trained on all actions; override
+that only for diagnostics with `--allow-all-action-trained-model`. It also
+checks the Stage 0 data fingerprint stored in the encoder metadata; bypass this
+only for diagnostics with `--allow-cross-data-model`.
+Use `--bootstrap-repeats` for non-smoke Stage B.2 runs so
+`state_signature_bootstrap_ci.csv` records query-bootstrap confidence intervals.
+Use `state_strata_fraction_summary.csv` to choose a stable stratum policy before
+interpreting `regular_state` versus `blind_state`.
+
+The first larger local CPU Stage B.2 run is recorded in
+`docs/stageb2_v1_cpu_experiment.md`. Treat it as a real experiment with a
+negative/weak decision, not as a pass. Before moving to Stage C, repair the
+state-stratum policy, make probe-to-heldout transfer the primary pass metric,
+and require redundancy controls to pass that cross-action transfer check.
+
 ## Add Stage C: selective prediction
+
+Stage C is still too early. Add selective-prediction baselines only after Stage
+B.1 controls and Stage B.2 state-level action-effect signature alignment are
+stable.
 
 Create:
 

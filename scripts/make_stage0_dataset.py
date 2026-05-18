@@ -66,6 +66,12 @@ def parse_args() -> argparse.Namespace:
         help="Store dense delta arrays for at most this many state-action samples. Detectability is still stored for all samples.",
     )
     p.add_argument(
+        "--dense-sampling",
+        choices=["random", "full-states"],
+        default=None,
+        help="Choose dense delta rows randomly or as complete state x action-bank blocks.",
+    )
+    p.add_argument(
         "--max-delta-bytes",
         type=int,
         default=None,
@@ -100,6 +106,38 @@ def estimate_delta_bytes(grid_size: int, channels: List[str], max_delta_samples:
     return estimate_channel_storage_bytes(grid_size, channels, max_delta_samples)
 
 
+def make_delta_keep(
+    *,
+    n_states: int,
+    k_actions: int,
+    max_delta_samples: int,
+    dense_sampling: str,
+    rng: np.random.Generator,
+) -> tuple[np.ndarray, np.ndarray]:
+    n = n_states * k_actions
+    if dense_sampling == "random":
+        if max_delta_samples >= n:
+            return np.ones(n, dtype=bool), np.arange(n_states, dtype=np.int32)
+        keep = np.zeros(n, dtype=bool)
+        keep[rng.choice(n, size=max_delta_samples, replace=False)] = True
+        return keep, np.unique(np.nonzero(keep)[0] // k_actions).astype(np.int32)
+
+    if dense_sampling != "full-states":
+        raise ValueError(f"Unsupported dense sampling mode: {dense_sampling}")
+    if max_delta_samples < k_actions:
+        raise ValueError(
+            "--dense-sampling full-states requires --max-delta-samples to be at least the action-bank size "
+            f"({k_actions})."
+        )
+    n_dense_states = max(1, min(n_states, max_delta_samples // k_actions))
+    state_ids = np.sort(rng.choice(n_states, size=n_dense_states, replace=False)).astype(np.int32)
+    keep = np.zeros(n, dtype=bool)
+    for state_id in state_ids:
+        start = int(state_id) * k_actions
+        keep[start : start + k_actions] = True
+    return keep, state_ids
+
+
 def main() -> None:
     args = parse_args()
     cfg = load_json(args.config)
@@ -115,6 +153,7 @@ def main() -> None:
     max_delta_bytes = args.max_delta_bytes
     if max_delta_bytes is None:
         max_delta_bytes = int(cfg.get("max_delta_bytes", 1_000_000_000))
+    dense_sampling = args.dense_sampling or str(cfg.get("dense_sampling", "random"))
     store_static_obs = bool(args.store_static_obs or cfg.get("store_static_obs", False))
     max_static_bytes = args.max_static_bytes
     if max_static_bytes is None:
@@ -145,11 +184,13 @@ def main() -> None:
             f"{estimated_static_bytes} bytes > budget {max_static_bytes} bytes. "
             "Lower --max-delta-samples, disable --store-static-obs, or raise --max-static-bytes intentionally."
         )
-    if max_delta_samples >= n:
-        delta_keep = np.ones(n, dtype=bool)
-    else:
-        delta_keep = np.zeros(n, dtype=bool)
-        delta_keep[rng.choice(n, size=max_delta_samples, replace=False)] = True
+    delta_keep, dense_state_ids = make_delta_keep(
+        n_states=n_states,
+        k_actions=k_actions,
+        max_delta_samples=max_delta_samples,
+        dense_sampling=dense_sampling,
+        rng=rng,
+    )
 
     world_delta = np.zeros(n, dtype=np.float32)
     state_id = np.zeros(n, dtype=np.int32)
@@ -224,6 +265,12 @@ def main() -> None:
         "seed": np.array([seed], dtype=np.int32),
         "schema_version": np.array(["stage0_v2"]),
         "delta_sample_indices": np.nonzero(delta_keep)[0].astype(np.int64),
+        "dense_sampling": np.array([dense_sampling]),
+        "dense_state_ids": dense_state_ids.astype(np.int32),
+        "touched_dense_state_ids": np.unique(np.nonzero(delta_keep)[0] // k_actions).astype(np.int32),
+        "complete_dense_state_ids": dense_state_ids.astype(np.int32)
+        if dense_sampling == "full-states"
+        else np.zeros(0, dtype=np.int32),
         "max_delta_samples": np.array([max_delta_samples], dtype=np.int32),
         "estimated_delta_bytes": np.array([estimated_delta_bytes], dtype=np.int64),
         "store_static_obs": np.array([store_static_obs]),

@@ -138,3 +138,76 @@ def test_make_stage0_dataset_static_obs_budget_failure(tmp_path):
     )
     assert result.returncode != 0
     assert "Estimated static obs0 storage is too large" in result.stderr
+
+
+def test_make_stage0_dataset_full_state_dense_sampling(tmp_path):
+    out = tmp_path / "stage0_full_states.npz"
+    env = dict(os.environ)
+    env["PYTHONPATH"] = "src"
+    subprocess.run(
+        [
+            sys.executable,
+            "scripts/make_stage0_dataset.py",
+            "--out",
+            str(out),
+            "--n-states",
+            "5",
+            "--k-actions",
+            "4",
+            "--grid-size",
+            "8",
+            "--horizon",
+            "1",
+            "--channels",
+            "rgb",
+            "range",
+            "--max-delta-samples",
+            "8",
+            "--dense-sampling",
+            "full-states",
+            "--store-static-obs",
+        ],
+        check=True,
+        env=env,
+    )
+    with np.load(out, allow_pickle=True) as data:
+        sample_indices = data["delta_sample_indices"]
+        assert data["dense_sampling"].tolist() == ["full-states"]
+        assert sample_indices.shape[0] == 8
+        state_ids = data["state_id"][sample_indices]
+        action_ids = data["action_id"][sample_indices]
+        assert len(np.unique(state_ids)) == 2
+        for state_id in np.unique(state_ids):
+            np.testing.assert_array_equal(np.sort(action_ids[state_ids == state_id]), np.arange(4))
+
+
+def test_make_stage0_dataset_full_state_requires_action_bank_budget(tmp_path):
+    out = tmp_path / "stage0_bad_full_states.npz"
+    env = dict(os.environ)
+    env["PYTHONPATH"] = "src"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/make_stage0_dataset.py",
+            "--out",
+            str(out),
+            "--n-states",
+            "2",
+            "--k-actions",
+            "4",
+            "--grid-size",
+            "8",
+            "--channels",
+            "rgb",
+            "--max-delta-samples",
+            "3",
+            "--dense-sampling",
+            "full-states",
+        ],
+        check=False,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert "requires --max-delta-samples to be at least the action-bank size" in result.stderr

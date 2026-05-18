@@ -1,8 +1,10 @@
 # Stage B Status
 
 This repo should treat Stage 0 as the channel-adequacy gate and Stage B as a
-controlled alignment pilot. Stage C / PSP-like selective prediction is not the
-next step until the Stage B confounds below are resolved.
+controlled alignment pilot. Stage C / PSP-like selective prediction is still too
+early. Stage B.2 state-level action-effect signature alignment is implemented as
+a smoke/pilot path, but the first v1 CPU experiment did not pass the scientific
+gate.
 
 ## Current Interpretation
 
@@ -14,6 +16,8 @@ next step until the Stage B confounds below are resolved.
   controls before it can support the core action-effect alignment claim.
 - `local` is action-conditioned and should be interpreted as a diagnostic pair
   until same-action and residualized controls explain or repair its behavior.
+- Stage B.2 v1 produced a weak `rgb-range` all-state held-out signal, but not a
+  regular-vs-blind stratum signal and not a probe-to-heldout transfer signal.
 
 ## Stage B.1 Controls
 
@@ -45,6 +49,89 @@ For `local`, even the static observation is action-conditioned because it is a
 pre-action patch around the action site. Treat local static rows as an
 action-site diagnostic rather than a pure state-only PRH baseline.
 
+## Stage B.2 Next Priority
+
+Stage B.2 should align state-level action-effect signatures, not individual
+state-action rows. For each state `s`, estimate `D_m(s)` for channel `m` from a
+probe action split, then evaluate cross-channel alignment on a held-out test
+action split.
+
+The primary strata should be state-level labels:
+
+- `regular_state`: state `s` has a reliable channel-visible action-effect
+  signature for channel `m`;
+- `blind_state`: state `s` has a physical action-effect signature but channel
+  `m` does not reliably register it.
+
+The probe/test action split is required because the actions used to estimate or
+select `D_m(s)` must not be the same actions used to score the alignment. This
+keeps Stage B.2 focused on state-level action-effect geometry rather than
+same-row action leakage.
+
+Generate Stage B.2 datasets with `--dense-sampling full-states`; random dense
+subsets generally do not contain every action for a selected state and therefore
+cannot form a complete `D_m(s)` matrix.
+
+For primary held-out action evidence, fit the action-effect encoder only on the
+probe action IDs with `scripts/train_transition_encoder.py --train-action-ids`.
+`scripts/analyze_state_signature_knn.py` requires this match by default. Use
+`--allow-all-action-trained-model` only for explicitly labeled diagnostics,
+because otherwise the encoder has already seen the held-out action columns.
+The analyzer also checks the encoder's Stage 0 data fingerprint by default; use
+`--allow-cross-data-model` only for explicitly labeled diagnostics.
+
+## Stage B.2 v1 CPU Result
+
+The first non-smoke Stage B.2 run is recorded in
+`docs/stageb2_v1_cpu_experiment.md`.
+
+Summary:
+
+- local CPU only, no qsub;
+- `512` sampled states, `64` actions, `128` complete dense states;
+- probe action IDs `0..31`, held-out action IDs `32..63`;
+- action-effect and static encoders trained only on probe action IDs;
+- `q=0.25` and `q=0.60` state-stratum thresholds evaluated.
+
+Decision:
+
+```text
+Stage B.2 v1: weak partial signal, not pass.
+Stage C remains blocked.
+```
+
+Key `q=0.25` `rgb-range` results:
+
+```text
+held-out action-effect all:           overlap 0.1188, adjusted +0.0400
+held-out action-effect regular_state: overlap 0.1187, adjusted +0.0400
+held-out action-effect blind_state:   overlap 0.1155, adjusted +0.0368
+static all:                           overlap 0.0742
+delta-minus-static all:               +0.0445
+probe-to-heldout all:                 overlap 0.0742, adjusted -0.0045
+```
+
+Interpretation:
+
+- `rgb-range` action-effect signature is above static and above the
+  action-column shuffled control on all states.
+- `regular_state` is not meaningfully above `blind_state`.
+- probe-to-heldout transfer is at chance.
+- `q=0.60` has zero valid `rgb-range` regular/blind state queries.
+
+The next loop should repair the state-stratum policy and cross-action transfer
+metric before scaling or moving to Stage C.
+
+Bootstrap/fraction follow-up:
+
+- `q=0.25` `rgb-range` held-out all overlap has a bootstrap 95% CI of roughly
+  `[0.0984, 0.1414]`, while static all is roughly `[0.0602, 0.0891]` and
+  action-column shuffled all is roughly `[0.0516, 0.0785]`.
+- `q=0.25` `rgb-range` `regular_state` and `blind_state` intervals overlap
+  substantially: regular `[0.0750, 0.1750]`, blind `[0.0931, 0.1401]`.
+- `rgb-range` `regular_both_fraction` has q90 `0.25` and max `0.3125`, so
+  fixed `0.60` regular-state thresholds are not viable for this run.
+
 ## Reproducible Smoke
 
 Run:
@@ -69,4 +156,30 @@ outputs/stageb_b1_smoke/static_vs_action_effect/reports/
 ```
 
 These NumPy pilots are CPU jobs and do not require qsub, GPU, or CUDA. Add qsub
-scripts only when moving to neural encoders or world-model training.
+scripts only when moving to neural encoders, world-model training, or multi-seed
+CPU sweeps that clearly exceed local interactive runtime.
+
+For the state-level Stage B.2 smoke:
+
+```bash
+PYTHONPATH=src bash scripts/run_stageb_b2_smoke.sh outputs/stageb_b2_smoke
+```
+
+Key reports:
+
+```text
+outputs/stageb_b2_smoke/state_signature_knn/reports/
+  primary_state_signature_knn.csv
+  state_signature_knn.csv
+  heldout_action_signature_knn.csv
+  state_strata_fractions.csv
+  state_strata_fraction_summary.csv
+  state_signature_bootstrap_ci.csv
+  state_delta_minus_static_gain.csv
+  diagnostic_probe_delta_minus_static_gain.csv
+```
+
+`state_delta_minus_static_gain.csv` compares the primary held-out action-effect
+signature to the static baseline. The probe-action version is diagnostic-only.
+Use `--bootstrap-repeats` to write `state_signature_bootstrap_ci.csv` with
+query-bootstrap confidence intervals for the primary and diagnostic controls.

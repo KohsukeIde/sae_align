@@ -257,3 +257,115 @@ def test_static_action_effect_compare_script_writes_gain_table(tmp_path):
     assert summary["channels"] == ["rgb", "range", "local"]
     assert summary["n_points"] == 10
     assert summary["same_state_static_neighbors_excluded"]
+
+
+def test_state_signature_knn_script_writes_stageb2_reports(tmp_path):
+    rng = np.random.default_rng(4)
+    data_path = tmp_path / "stage0_state_signature.npz"
+    n_states = 6
+    n_actions = 4
+    n = n_states * n_actions
+    static_perm = np.arange(n - 1, -1, -1, dtype=np.int64)
+    state_id = np.repeat(np.arange(n_states, dtype=np.int32), n_actions)
+    action_id = np.tile(np.arange(n_actions, dtype=np.int32), n_states)
+    action_type = np.array(["place", "erase", "push", "place"] * n_states)
+    obs0_rgb = rng.normal(size=(n, 3, 4, 4)).astype(np.float32)
+    obs0_range = rng.normal(size=(n, 4, 4, 4)).astype(np.float32)
+    obs0_local = rng.normal(size=(n, 4, 3, 3)).astype(np.float32)
+    np.savez_compressed(
+        data_path,
+        world_delta=np.linspace(0.0, 1.0, n, dtype=np.float32),
+        state_id=state_id,
+        action_id=action_id,
+        action_type=action_type,
+        action_array=rng.normal(size=(n, 5)).astype(np.float32),
+        channels=np.array(["rgb", "range", "local"]),
+        stageb_default_channels=np.array(["rgb", "range", "local"]),
+        delta_sample_indices=np.arange(n, dtype=np.int64),
+        static_obs_sample_indices=static_perm,
+        delta_rgb=rng.normal(size=(n, 3, 4, 4)).astype(np.float32),
+        delta_range=rng.normal(size=(n, 4, 4, 4)).astype(np.float32),
+        delta_local=rng.normal(size=(n, 4, 3, 3)).astype(np.float32),
+        obs0_rgb=obs0_rgb[static_perm],
+        obs0_range=obs0_range[static_perm],
+        obs0_local=obs0_local[static_perm],
+        detect_rgb=np.linspace(0.0, 0.3, n, dtype=np.float32),
+        detect_range=np.linspace(0.1, 0.4, n, dtype=np.float32),
+        detect_local=np.linspace(0.2, 0.5, n, dtype=np.float32),
+    )
+
+    env = dict(os.environ)
+    env["PYTHONPATH"] = "src"
+    action_model_dir = tmp_path / "action_model"
+    static_model_dir = tmp_path / "static_model"
+    for model_dir, extra in [
+        (action_model_dir, []),
+        (static_model_dir, ["--feature-kind", "static"]),
+    ]:
+        subprocess.run(
+            [
+                sys.executable,
+                "scripts/train_transition_encoder.py",
+                "--data",
+                str(data_path),
+                "--out",
+                str(model_dir),
+                "--n-components",
+                "3",
+                "--max-train-samples",
+                "20",
+                "--train-action-ids",
+                "0",
+                "1",
+                *extra,
+            ],
+            check=True,
+            env=env,
+        )
+
+    out = tmp_path / "stageb2"
+    subprocess.run(
+        [
+            sys.executable,
+            "scripts/analyze_state_signature_knn.py",
+            "--data",
+            str(data_path),
+            "--model",
+            str(action_model_dir / "transition_encoders.npz"),
+            "--static-model",
+            str(static_model_dir / "transition_encoders.npz"),
+            "--out",
+            str(out),
+            "--k",
+            "2",
+            "--max-states",
+            "5",
+            "--probe-fraction",
+            "0.5",
+            "--probe-action-ids",
+            "0",
+            "1",
+            "--bootstrap-repeats",
+            "10",
+            "--bootstrap-seed",
+            "4",
+        ],
+        check=True,
+        env=env,
+    )
+    assert (out / "reports" / "state_signature_knn.csv").exists()
+    assert (out / "reports" / "primary_state_signature_knn.csv").exists()
+    assert (out / "reports" / "heldout_action_signature_knn.csv").exists()
+    assert (out / "reports" / "state_strata_fractions.csv").exists()
+    assert (out / "reports" / "state_strata_fraction_summary.csv").exists()
+    assert (out / "reports" / "state_signature_bootstrap_ci.csv").exists()
+    assert (out / "reports" / "state_delta_minus_static_gain.csv").exists()
+    assert (out / "reports" / "diagnostic_probe_delta_minus_static_gain.csv").exists()
+    summary = json.loads((out / "reports" / "stageb2_state_signature_summary.json").read_text())
+    assert summary["n_states"] == 5
+    assert len(summary["probe_action_ids"]) == 2
+    assert len(summary["heldout_action_ids"]) == 2
+    assert summary["encoder_action_split"] == "probe_only"
+    assert summary["bootstrap_repeats"] == 10
+    assert summary["controls"]["probe_to_heldout_cross"]
+    assert summary["controls"]["action_column_shuffled"]
