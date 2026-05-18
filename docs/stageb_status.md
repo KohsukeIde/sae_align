@@ -145,6 +145,37 @@ It is diagnostic-only: redundancy cross-action calibration did not reliably pass
 under the bootstrap CI criterion, so Stage C remains blocked and neither Option
 2.5 nor Option 3 is promoted yet.
 
+## Stage B.4 Split-Half Reliability Gate
+
+Stage B.4 is recorded in `docs/stageb4_preregistration.md` and
+`docs/stageb4_v1_cpu_experiment.md`. It adds a Gate -1 before cross-channel
+alignment: same-channel action-effect signatures must be reliable across the
+probe/held-out action split.
+
+The B.4 v1 CPU result:
+
+```text
+identity same-action: pass
+same-channel split-half reliability: fail
+same-channel vs action-column-shuffled paired CI: fail
+redundancy cross-channel calibration: fail
+```
+
+Decision:
+
+```text
+Stage B.4 v1: not pass.
+Stop at Gate -1b.
+Stage C remains blocked.
+Option 3 remains only a candidate, not a pivot.
+```
+
+The current blocker is not `rgb-range` itself. It is that same-channel
+probe/held-out action-effect signatures are not stable enough to make
+cross-channel probe-to-heldout alignment interpretable. Next diagnostics should
+separate raw-delta signature reliability, random projection, all-action PCA
+upper bound, held-out split-half, and tie-jitter sensitivity.
+
 ## Reproducible Smoke
 
 Run:

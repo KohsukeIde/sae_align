@@ -12,7 +12,7 @@ The goal of this first phase is *not* to train a full world model or reproduce D
 4. Derived diagnostics such as edge maps are interpreted separately from redundancy controls.
 5. We can later use these strata for stratified action-effect alignment and selective prediction.
 
-The repository is designed to be extended incrementally. Stage 0 is implemented, and the first NumPy Stage B action-effect kNN pipeline is available for pilot diagnostics. Current Stage 0/B pilots are NumPy-only CPU runs and do not require qsub, a GPU, or CUDA. Stage C is still too early; the next priority is Stage B.2 state-level action-effect signature alignment.
+The repository is designed to be extended incrementally. Stage 0 is implemented, and the NumPy Stage B action-effect kNN pipeline is available for pilot diagnostics. Current Stage 0/B pilots are NumPy-only CPU runs and do not require qsub, a GPU, or CUDA. Stage C is still too early; the current blocker is Stage B.4 split-half reliability for state-level action-effect signatures.
 
 ---
 
@@ -54,6 +54,7 @@ Implemented now:
 - NumPy Stage B transition encoders and regular/blind pairwise kNN alignment reports.
 - Stage B.1 confound-control smoke reports for action-restricted, action-residualized, and static-vs-action-effect comparisons;
 - Stage B.2 state-level action-effect signature smoke/pilot reports with full-state dense sampling, probe-action encoder training, held-out action scoring, and static baselines.
+- Stage B.3/B.4 calibration reports for redundancy transfer, normalization, same-channel split-half reliability, and feature tie diagnostics.
 
 Not implemented yet:
 
@@ -195,10 +196,10 @@ This adds same-action-type, same-action-id, action-residualized, and
 static-vs-action-effect reports. See `docs/stageb_status.md` for the current
 interpretation and remaining Stage B loopholes.
 
-The current priority remains Stage B.2 hardening: estimate a state-level
-action-effect signature `D_m(s)` from probe actions, label `regular_state` /
-`blind_state` at the state level, and score alignment on held-out test actions.
-Do this before Stage C selective prediction or world-model baselines.
+The current priority is Stage B.4 reliability hardening: before interpreting
+`rgb-range`, first show that same-channel state-level action-effect signatures
+are stable across probe/held-out action splits. Do this before Stage C selective
+prediction or world-model baselines.
 
 For a minimal Stage B.2 smoke run:
 
@@ -224,3 +225,14 @@ PYTHONPATH=src bash scripts/run_stageb_b3_smoke.sh outputs/stageb_b3_smoke
 Read `docs/stageb3_preregistration.md` before interpreting the result. B.3 is
 designed to decide between metric repair, continuous observability, and
 action-coupling framing; it is not a Stage C experiment.
+
+For the Stage B.4 split-half reliability gate:
+
+```bash
+PYTHONPATH=src bash scripts/run_stageb_b4_smoke.sh outputs/stageb_b4_smoke
+```
+
+Read `docs/stageb4_preregistration.md` and
+`docs/stageb4_v1_cpu_experiment.md`. B.4 v1 did not pass: identity checks
+passed, but same-channel split-half reliability and redundancy calibration
+failed under CI. Stage C remains blocked.

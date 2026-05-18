@@ -92,11 +92,19 @@ The B.3 reports test balanced action splits, non-transductive normalization,
 held-out static/shuffled controls, redundancy probe-to-heldout calibration, and
 continuous observability scores.
 
+Stage B.4 is now the active blocker. Read `docs/stageb4_preregistration.md` and
+`docs/stageb4_v1_cpu_experiment.md`. B.4 checks whether same-channel
+state-level action-effect signatures are reliable across probe/held-out actions
+before any cross-channel claim. B.4 v1 failed at same-channel reliability, so
+the next work should diagnose raw delta signatures, random projections,
+all-action PCA upper bounds, held-out split-half reliability, and tie-jitter
+sensitivity.
+
 ## Add Stage C: selective prediction
 
 Stage C is still too early. Add selective-prediction baselines only after Stage
-B.1 controls and Stage B.2 state-level action-effect signature alignment are
-stable.
+B.4 same-channel reliability and redundancy calibration pass, and after Stage
+B.3-style target alignment has a calibrated metric.
 
 Create:
 

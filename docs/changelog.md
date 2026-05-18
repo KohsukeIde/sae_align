@@ -13,6 +13,15 @@
 - Recorded the Stage B.2 v1 local CPU experiment and its decision: weak partial signal, not pass; Stage C remains blocked.
 - Added Stage B.3 preregistration, balanced action-split generation, and gate-analysis scripts for normalization, redundancy transfer, static/shuffled controls, and continuous observability diagnostics.
 - Recorded the Stage B.3 v1 local CPU grid: diagnostic-only, redundancy probe-to-heldout calibration failed, Stage C remains blocked.
+- Added Stage B.4 split-half reliability gates, identity checks, same-channel
+  versus shuffled paired bootstrap CI, feature tie diagnostics, and grid
+  aggregation.
+- Updated balanced action split scoring to use primary-channel detectability
+  and conditional blindness while excluding diagnostic/oracle channels from
+  split optimization.
+- Recorded Stage B.4 v1 local CPU grid: identity passed, but same-channel
+  reliability and redundancy calibration failed under CI; Stage C remains
+  blocked.
 
 ## v0.1.0
 

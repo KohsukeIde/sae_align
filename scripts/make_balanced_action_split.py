@@ -19,6 +19,8 @@ import numpy as np
 
 from sae_align.utils.io import ensure_dir, save_json
 
+PRIMARY_BALANCE_CHANNELS = ("rgb", "range", "local", "noisy_rgb", "gray_rgb", "blur_rgb")
+
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
@@ -82,8 +84,32 @@ def action_table(data: Mapping[str, np.ndarray]) -> list[dict[str, object]]:
             row[f"mean_detect_{channel}"] = float(np.mean(detect[mask]))
             row[f"blind_rate_{channel}"] = float(np.mean(np.logical_and(physical[mask], detect[mask] <= tau)))
             row[f"regular_rate_{channel}"] = float(np.mean(np.logical_and(physical[mask], detect[mask] > tau)))
+            physical_mask = physical[mask]
+            if np.any(physical_mask):
+                detect_physical = detect[mask][physical_mask]
+                row[f"blind_given_physical_{channel}"] = float(np.mean(detect_physical <= tau))
+                row[f"regular_given_physical_{channel}"] = float(np.mean(detect_physical > tau))
+            else:
+                row[f"blind_given_physical_{channel}"] = 0.0
+                row[f"regular_given_physical_{channel}"] = 0.0
         rows.append(row)
     return rows
+
+
+def balance_numeric_keys(rows: list[dict[str, object]]) -> list[str]:
+    """Numeric split-balance fields.
+
+    The Stage B.4 reliability gate is sensitive to action-effect observability
+    mismatch, so channel-specific detectability summaries are part of the split
+    score, not only post-hoc diagnostics.
+    """
+    base = ["x", "y", "mean_world_delta", "nonnull_rate", "physical_rate"]
+    extra = []
+    for channel in PRIMARY_BALANCE_CHANNELS:
+        for key in [f"mean_detect_{channel}", f"blind_given_physical_{channel}"]:
+            if key in rows[0] and isinstance(rows[0][key], (int, float, np.integer, np.floating)):
+                extra.append(key)
+    return base + extra
 
 
 def one_hot_balance_score(rows: list[dict[str, object]], probe_ids: set[int]) -> float:
@@ -95,7 +121,7 @@ def one_hot_balance_score(rows: list[dict[str, object]], probe_ids: set[int]) ->
         p = np.asarray([np.mean([row[key] == name for row in probe]) for name in names], dtype=np.float32)
         h = np.asarray([np.mean([row[key] == name for row in held]) for name in names], dtype=np.float32)
         score += float(np.sum(np.abs(p - h)))
-    for key in ["x", "y", "mean_world_delta", "nonnull_rate", "physical_rate"]:
+    for key in balance_numeric_keys(rows):
         all_values = np.asarray([float(row[key]) for row in rows], dtype=np.float32)
         denom = float(np.std(all_values) + 1e-6)
         score += abs(float(np.mean([float(row[key]) for row in probe])) - float(np.mean([float(row[key]) for row in held]))) / denom

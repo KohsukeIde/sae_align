@@ -442,3 +442,44 @@ def test_state_signature_knn_script_writes_stageb2_reports(tmp_path):
         "probe_action_type_apply",
         "probe_global_apply",
     ]
+
+    b4_out = tmp_path / "stageb4"
+    subprocess.run(
+        [
+            sys.executable,
+            "scripts/analyze_stageb4_reliability.py",
+            "--data",
+            str(data_path),
+            "--model",
+            str(action_model_dir / "transition_encoders.npz"),
+            "--out",
+            str(b4_out),
+            "--channels",
+            "rgb",
+            "range",
+            "local",
+            "--probe-action-ids",
+            "0",
+            "1",
+            "2",
+            "--k",
+            "2",
+            "--max-states",
+            "5",
+            "--bootstrap-repeats",
+            "5",
+            "--normalization-modes",
+            "none",
+            "probe_global_apply",
+            "probe_action_type_apply",
+        ],
+        check=True,
+        env=env,
+    )
+    assert (b4_out / "reports" / "identity_same_action_reliability.csv").exists()
+    assert (b4_out / "reports" / "same_channel_probe_heldout_reliability.csv").exists()
+    assert (b4_out / "reports" / "same_channel_vs_shuffled_paired_ci.csv").exists()
+    assert (b4_out / "reports" / "feature_tie_diagnostics.csv").exists()
+    assert (b4_out / "reports" / "gate_summary_ci.csv").exists()
+    b4_summary = json.loads((b4_out / "reports" / "stageb4_summary.json").read_text())
+    assert b4_summary["gate_order"][0] == "gate_minus1_identity_same_probe_and_heldout_action"
