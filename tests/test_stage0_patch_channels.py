@@ -1,6 +1,9 @@
 import numpy as np
 import importlib.util
+import os
 from pathlib import Path
+import subprocess
+import sys
 
 from sae_align.envs.toy_powder import (
     Action,
@@ -59,3 +62,79 @@ def test_legacy_event_schema_normalizes_and_validates():
     assert "detect_event_response" in normalized
     summary = analyze_stage0_channels.validate_dense_deltas(normalized, ["rgb", "event_response"])
     assert summary["dense_delta_samples"] == 2
+
+
+def test_make_stage0_dataset_can_store_static_obs0(tmp_path):
+    out = tmp_path / "stage0_static.npz"
+    env = dict(os.environ)
+    env["PYTHONPATH"] = "src"
+    subprocess.run(
+        [
+            sys.executable,
+            "scripts/make_stage0_dataset.py",
+            "--out",
+            str(out),
+            "--n-states",
+            "2",
+            "--k-actions",
+            "3",
+            "--grid-size",
+            "8",
+            "--horizon",
+            "1",
+            "--channels",
+            "rgb",
+            "range",
+            "local",
+            "event_response",
+            "--max-delta-samples",
+            "4",
+            "--store-static-obs",
+            "--max-static-bytes",
+            "1000000",
+        ],
+        check=True,
+        env=env,
+    )
+    with np.load(out, allow_pickle=True) as data:
+        dense_idx = data["delta_sample_indices"]
+        np.testing.assert_array_equal(data["static_obs_sample_indices"], dense_idx)
+        assert data["obs0_rgb"].shape[0] == dense_idx.shape[0] == 4
+        assert data["obs0_range"].shape[0] == 4
+        assert data["obs0_local"].shape[0] == 4
+        assert data["obs0_event_response"].shape == (4, 5)
+        assert bool(data["store_static_obs"][0])
+        assert int(data["estimated_static_obs_bytes"][0]) > 0
+
+
+def test_make_stage0_dataset_static_obs_budget_failure(tmp_path):
+    out = tmp_path / "stage0_static_too_large.npz"
+    env = dict(os.environ)
+    env["PYTHONPATH"] = "src"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/make_stage0_dataset.py",
+            "--out",
+            str(out),
+            "--n-states",
+            "1",
+            "--k-actions",
+            "2",
+            "--grid-size",
+            "8",
+            "--channels",
+            "rgb",
+            "--max-delta-samples",
+            "2",
+            "--store-static-obs",
+            "--max-static-bytes",
+            "1",
+        ],
+        check=False,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert "Estimated static obs0 storage is too large" in result.stderr

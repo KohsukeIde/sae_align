@@ -6,6 +6,7 @@ The generated dataset stores, for each sampled state-action pair:
 - action-induced physical change magnitude E_x;
 - channel-wise observation detectability scores for all samples;
 - dense channel deltas for a configurable subset of samples;
+- optional pre-action/static observations for that same dense subset;
 - metadata for action type and state/action IDs;
 - example observations for plotting.
 
@@ -70,10 +71,21 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Fail before generation if dense delta storage is estimated to exceed this many bytes.",
     )
+    p.add_argument(
+        "--store-static-obs",
+        action="store_true",
+        help="Also store pre-action/static observations as obs0_<channel> for the dense delta subset.",
+    )
+    p.add_argument(
+        "--max-static-bytes",
+        type=int,
+        default=None,
+        help="Fail before generation if static obs0 storage is estimated to exceed this many bytes.",
+    )
     return p.parse_args()
 
 
-def estimate_delta_bytes(grid_size: int, channels: List[str], max_delta_samples: int) -> int:
+def estimate_channel_storage_bytes(grid_size: int, channels: List[str], n_samples: int) -> int:
     probe_grid = np.zeros((grid_size, grid_size), dtype=np.int16)
     probe_action = Action("place", x=min(1, grid_size - 1), y=min(1, grid_size - 1), element=1)
     event_counts = np.zeros(len(EVENT_NAMES), dtype=np.float32)
@@ -81,7 +93,11 @@ def estimate_delta_bytes(grid_size: int, channels: List[str], max_delta_samples:
     for ch in channels:
         arr = render_channel(probe_grid, ch, action=probe_action, event_counts=event_counts, noise_seed=0)
         per_sample += int(arr.astype(np.float32).nbytes)
-    return int(per_sample * max_delta_samples)
+    return int(per_sample * n_samples)
+
+
+def estimate_delta_bytes(grid_size: int, channels: List[str], max_delta_samples: int) -> int:
+    return estimate_channel_storage_bytes(grid_size, channels, max_delta_samples)
 
 
 def main() -> None:
@@ -99,12 +115,17 @@ def main() -> None:
     max_delta_bytes = args.max_delta_bytes
     if max_delta_bytes is None:
         max_delta_bytes = int(cfg.get("max_delta_bytes", 1_000_000_000))
+    store_static_obs = bool(args.store_static_obs or cfg.get("store_static_obs", False))
+    max_static_bytes = args.max_static_bytes
+    if max_static_bytes is None:
+        max_static_bytes = int(cfg.get("max_static_bytes", 1_000_000_000))
 
     env = ToyPowderWorld(grid_size=grid_size, seed=seed)
     rng = np.random.default_rng(seed + 12345)
     states = [env.sample_state() for _ in range(n_states)]
     actions = env.make_action_bank(k=k_actions)
     noop = Action("noop")
+    zero_events = np.zeros(len(EVENT_NAMES), dtype=np.float32)
 
     n = n_states * k_actions
     max_delta_samples = max(1, min(int(max_delta_samples), n))
@@ -114,6 +135,15 @@ def main() -> None:
             "Estimated dense delta storage is too large: "
             f"{estimated_delta_bytes} bytes > budget {max_delta_bytes} bytes. "
             "Lower --max-delta-samples or raise --max-delta-bytes intentionally."
+        )
+    estimated_static_bytes = (
+        estimate_channel_storage_bytes(grid_size, channels, max_delta_samples) if store_static_obs else 0
+    )
+    if store_static_obs and estimated_static_bytes > max_static_bytes:
+        raise MemoryError(
+            "Estimated static obs0 storage is too large: "
+            f"{estimated_static_bytes} bytes > budget {max_static_bytes} bytes. "
+            "Lower --max-delta-samples, disable --store-static-obs, or raise --max-static-bytes intentionally."
         )
     if max_delta_samples >= n:
         delta_keep = np.ones(n, dtype=bool)
@@ -129,6 +159,7 @@ def main() -> None:
 
     detect: Dict[str, np.ndarray] = {ch: np.zeros(n, dtype=np.float32) for ch in channels}
     deltas: Dict[str, List[np.ndarray]] = {ch: [] for ch in channels}
+    static_obs: Dict[str, List[np.ndarray]] = {ch: [] for ch in channels}
 
     example_obs = {ch: [] for ch in channels}
     example_meta = []
@@ -146,6 +177,15 @@ def main() -> None:
 
             for ch in channels:
                 seed_base = int((si + 1) * 100000 + (ai + 7) * 997)
+                if store_static_obs and delta_keep[idx]:
+                    obs0 = render_channel(
+                        grid,
+                        ch,
+                        action=action,
+                        event_counts=zero_events,
+                        noise_seed=seed_base,
+                    )
+                    static_obs[ch].append(obs0.astype(np.float32))
                 obs_a = render_channel(
                     act_roll.final_grid,
                     ch,
@@ -186,14 +226,20 @@ def main() -> None:
         "delta_sample_indices": np.nonzero(delta_keep)[0].astype(np.int64),
         "max_delta_samples": np.array([max_delta_samples], dtype=np.int32),
         "estimated_delta_bytes": np.array([estimated_delta_bytes], dtype=np.int64),
+        "store_static_obs": np.array([store_static_obs]),
+        "estimated_static_obs_bytes": np.array([estimated_static_bytes], dtype=np.int64),
         "diagnostic_only_channels": np.array(list(cfg.get("diagnostic_only_channels", ["event_response"]))),
         "stageb_default_channels": np.array(list(cfg.get("stageb_default_channels", ["rgb", "range", "local"]))),
     }
+    if store_static_obs:
+        arrays["static_obs_sample_indices"] = np.nonzero(delta_keep)[0].astype(np.int64)
 
     for ch in channels:
         arrays[f"detect_{ch}"] = detect[ch]
         if deltas[ch]:
             arrays[f"delta_{ch}"] = np.stack(deltas[ch], axis=0).astype(np.float32)
+        if store_static_obs and static_obs[ch]:
+            arrays[f"obs0_{ch}"] = np.stack(static_obs[ch], axis=0).astype(np.float32)
         if example_obs[ch]:
             arrays[f"example_{ch}"] = np.stack(example_obs[ch], axis=0).astype(np.float32)
 

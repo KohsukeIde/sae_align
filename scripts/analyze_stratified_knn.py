@@ -19,9 +19,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from sae_align.analysis.knn_alignment import (
+    action_confound_features,
     cosine_knn_indices,
     pairwise_overlap_matrix,
     pairwise_stratified_overlap_rows,
+    residualize_embeddings,
+    restricted_candidate_counts,
+    restricted_cosine_knn_indices,
+    shuffled_assignment_knn_indices,
     stratified_knn_summary,
 )
 from sae_align.analysis.strata import (
@@ -101,18 +106,30 @@ def plot_matrix(path: Path, names: Sequence[str], mat: np.ndarray, title: str) -
 def action_only_features(data: Dict[str, np.ndarray], sample_indices: np.ndarray) -> np.ndarray | None:
     if "action_array" not in data:
         return None
-    x = np.asarray(data["action_array"][sample_indices], dtype=np.float32)
-    if "action_type" in data:
-        labels = np.asarray(data["action_type"][sample_indices]).astype(str)
-        names = sorted(set(labels.tolist()))
-        one_hot = np.zeros((labels.shape[0], len(names)), dtype=np.float32)
-        index = {name: i for i, name in enumerate(names)}
-        for i, label in enumerate(labels):
-            one_hot[i, index[label]] = 1.0
-        x = np.concatenate([x, one_hot], axis=1)
-    x = x - x.mean(axis=0, keepdims=True)
-    x = x / (x.std(axis=0, keepdims=True) + 1e-6)
-    return x.astype(np.float32)
+    action_array = subset_stage0_vector(data, "action_array", sample_indices)
+    action_type = subset_stage0_vector(data, "action_type", sample_indices).astype(str)
+    return action_confound_features(action_array, action_type)
+
+
+def action_id_labels(data: Dict[str, np.ndarray], sample_indices: np.ndarray) -> tuple[np.ndarray, str] | None:
+    if "action_id" in data:
+        return subset_stage0_vector(data, "action_id", sample_indices).astype(np.int64), "same_action_id"
+    if "action_array" not in data:
+        return None
+    action_array = np.asarray(subset_stage0_vector(data, "action_array", sample_indices), dtype=np.float32)
+    if action_array.ndim == 1:
+        action_array = action_array[:, None]
+    else:
+        action_array = action_array.reshape(action_array.shape[0], -1)
+    action_type = subset_stage0_vector(data, "action_type", sample_indices).astype(str)
+    labels: list[int] = []
+    seen: dict[tuple[object, ...], int] = {}
+    for typ, row in zip(action_type.tolist(), action_array.tolist()):
+        key = (typ, *row)
+        if key not in seen:
+            seen[key] = len(seen)
+        labels.append(seen[key])
+    return np.asarray(labels, dtype=np.int64), "same_action_signature"
 
 
 def action_control_rows(
@@ -202,13 +219,20 @@ def main() -> None:
     )
 
     neighbor_sets: Dict[str, np.ndarray] = {}
+    embedding_sets: Dict[str, np.ndarray] = {}
     shuffled_neighbor_sets: Dict[str, np.ndarray] = {}
     rng = np.random.default_rng(args.seed + 2027)
     for ch in channels:
         emb = encoders[ch].transform(data[f"delta_{ch}"][dense_keep])
+        embedding_sets[ch] = emb
         neighbor_sets[ch] = cosine_knn_indices(emb, k=int(args.k), batch_size=int(args.batch_size))
         perm = rng.permutation(emb.shape[0])
-        shuffled_neighbor_sets[ch] = cosine_knn_indices(emb[perm], k=int(args.k), batch_size=int(args.batch_size))
+        shuffled_neighbor_sets[ch] = shuffled_assignment_knn_indices(
+            emb,
+            perm,
+            k=int(args.k),
+            batch_size=int(args.batch_size),
+        )
 
     overlap_names, overlap = pairwise_overlap_matrix(neighbor_sets, k=int(args.k))
     rows = stratified_knn_summary(
@@ -244,6 +268,42 @@ def main() -> None:
     )
     all_pair_rows = pair_rows + shuffled_pair_rows + shuffled_strata_rows
 
+    same_action_type_neighbors = {
+        ch: restricted_cosine_knn_indices(emb, action_type, k=int(args.k), batch_size=int(args.batch_size))
+        for ch, emb in embedding_sets.items()
+    }
+    same_action_type_counts = restricted_candidate_counts(action_type)
+    same_action_type_rows = pairwise_stratified_overlap_rows(
+        same_action_type_neighbors,
+        pair_strata,
+        k=int(args.k),
+        control="same_action_type",
+        candidate_counts=same_action_type_counts,
+    )
+    all_pair_rows.extend(same_action_type_rows)
+
+    same_action_id_rows: list[Dict[str, object]] = []
+    same_action_signature_rows: list[Dict[str, object]] = []
+    action_id_info = action_id_labels(data, sample_indices)
+    if action_id_info is not None:
+        action_ids, action_id_control = action_id_info
+        same_action_id_neighbors = {
+            ch: restricted_cosine_knn_indices(emb, action_ids, k=int(args.k), batch_size=int(args.batch_size))
+            for ch, emb in embedding_sets.items()
+        }
+        rows_for_action_id_control = pairwise_stratified_overlap_rows(
+            same_action_id_neighbors,
+            pair_strata,
+            k=int(args.k),
+            control=action_id_control,
+            candidate_counts=restricted_candidate_counts(action_ids),
+        )
+        if action_id_control == "same_action_id":
+            same_action_id_rows = rows_for_action_id_control
+        else:
+            same_action_signature_rows = rows_for_action_id_control
+        all_pair_rows.extend(rows_for_action_id_control)
+
     action_rows: list[Dict[str, object]] = []
     action_x = action_only_features(data, sample_indices)
     if action_x is not None:
@@ -261,15 +321,59 @@ def main() -> None:
             )
         )
 
+    residualized_rows: list[Dict[str, object]] = []
+    residualization_diagnostics: list[Dict[str, object]] = []
+    residualized_overlap_names: Sequence[str] = []
+    residualized_overlap = np.zeros((0, 0), dtype=np.float32)
+    if action_x is not None:
+        residualized_neighbor_sets = {}
+        for ch, emb in embedding_sets.items():
+            resid = residualize_embeddings(emb, action_x)
+            residualized_neighbor_sets[ch] = cosine_knn_indices(
+                resid,
+                k=int(args.k),
+                batch_size=int(args.batch_size),
+            )
+            original_energy = float(np.mean(np.sum(np.asarray(emb, dtype=np.float32) ** 2, axis=1)))
+            residual_energy = float(np.mean(np.sum(np.asarray(resid, dtype=np.float32) ** 2, axis=1)))
+            residualization_diagnostics.append(
+                {
+                    "channel": ch,
+                    "original_mean_squared_norm": original_energy,
+                    "residual_mean_squared_norm": residual_energy,
+                    "removed_fraction": 1.0 - residual_energy / original_energy
+                    if original_energy > 0.0
+                    else float("nan"),
+                }
+            )
+        residualized_overlap_names, residualized_overlap = pairwise_overlap_matrix(
+            residualized_neighbor_sets,
+            k=int(args.k),
+        )
+        residualized_rows = pairwise_stratified_overlap_rows(
+            residualized_neighbor_sets,
+            pair_strata,
+            k=int(args.k),
+            control="action_residualized",
+        )
+        all_pair_rows.extend(residualized_rows)
+
     out = ensure_dir(args.out)
     report_dir = ensure_dir(out / "reports")
     fig_dir = ensure_dir(out / "figures")
     write_matrix_csv(report_dir / "knn_overlap.csv", overlap_names, overlap)
+    if len(residualized_overlap_names):
+        write_matrix_csv(report_dir / "action_residualized_knn_overlap.csv", residualized_overlap_names, residualized_overlap)
     write_long_csv(report_dir / "neighbor_label_purity.csv", rows)
     write_long_csv(report_dir / "stratified_knn.csv", rows)
     write_long_csv(report_dir / "alignment_by_pair_and_stratum.csv", all_pair_rows)
     write_long_csv(report_dir / "pairwise_stratified_overlap.csv", all_pair_rows)
     write_long_csv(report_dir / "action_only_overlap.csv", action_rows)
+    write_long_csv(report_dir / "same_action_type_restricted_knn.csv", same_action_type_rows)
+    write_long_csv(report_dir / "same_action_id_restricted_knn.csv", same_action_id_rows)
+    write_long_csv(report_dir / "same_action_signature_restricted_knn.csv", same_action_signature_rows)
+    write_long_csv(report_dir / "action_residualized_pairwise_stratified_overlap.csv", residualized_rows)
+    write_long_csv(report_dir / "action_residualization_diagnostics.csv", residualization_diagnostics)
     plot_matrix(fig_dir / "knn_overlap.png", overlap_names, overlap, "Stage B kNN overlap")
 
     summary = {
@@ -295,6 +399,10 @@ def main() -> None:
             "shuffled_strata": bool(shuffled_strata_rows),
             "action_only": bool(action_rows),
             "shuffled_action": bool(action_rows),
+            "same_action_type": bool(same_action_type_rows),
+            "same_action_id": bool(same_action_id_rows),
+            "same_action_signature": bool(same_action_signature_rows),
+            "action_residualized": bool(residualized_rows),
         },
         "mean_pairwise_overlap": float(np.nanmean(overlap[np.triu_indices(len(channels), k=1)]))
         if len(channels) > 1

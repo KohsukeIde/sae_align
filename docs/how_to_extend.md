@@ -36,8 +36,17 @@ Required controls:
 - action-only controls;
 - shuffled-strata controls;
 - shuffled-action controls.
+- same-action-type and same-action-id restricted kNN;
+- action-residualized kNN as a sensitivity control;
+- static-vs-action-effect kNN comparison.
 
 Main control: strata must be defined using `x_star` and `o_m`, not representation deltas. Current Stage 0/B pilots are NumPy-only and do not require qsub, a GPU, or CUDA.
+
+Stage B.1 is the immediate hardening step before Stage C. Use
+`scripts/run_stageb_b1_smoke.sh` for a CPU smoke run. Read restricted-kNN results
+through `chance_adjusted_overlap`, `n_valid_queries`, and `mean_effective_k`.
+Static comparisons should exclude same-state neighbors when `state_id` is
+available, because the same state appears once per action.
 
 ## Add Stage C: selective prediction
 

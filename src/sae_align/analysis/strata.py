@@ -24,6 +24,14 @@ def dense_delta_sample_indices(data: Mapping[str, np.ndarray], n_dense: int) -> 
     return np.arange(n_dense, dtype=np.int64)
 
 
+def dense_static_sample_indices(data: Mapping[str, np.ndarray], n_dense: int) -> np.ndarray:
+    if "static_obs_sample_indices" in data:
+        return np.asarray(data["static_obs_sample_indices"], dtype=np.int64)
+    if "delta_sample_indices" in data:
+        return np.asarray(data["delta_sample_indices"], dtype=np.int64)
+    return np.arange(n_dense, dtype=np.int64)
+
+
 def validate_dense_stage0_data(
     data: Mapping[str, np.ndarray],
     channels: Sequence[str],
@@ -56,6 +64,36 @@ def validate_dense_stage0_data(
             raise ValueError(f"{delta_key} row count does not match {first}.")
         if require_detect and f"detect_{ch}" not in data:
             raise KeyError(f"Missing detectability array detect_{ch}.")
+    return sample_indices
+
+
+def validate_dense_static_data(data: Mapping[str, np.ndarray], channels: Sequence[str]) -> np.ndarray:
+    if not channels:
+        raise ValueError("No channels were selected.")
+    first = f"obs0_{channels[0]}"
+    if first not in data:
+        raise KeyError(f"Missing dense static observation array {first}.")
+    n_dense = int(np.asarray(data[first]).shape[0])
+    sample_indices = dense_static_sample_indices(data, n_dense)
+    if sample_indices.ndim != 1:
+        raise ValueError("static_obs_sample_indices must be one-dimensional.")
+    if int(sample_indices.shape[0]) != n_dense:
+        raise ValueError(
+            f"static sample indices have {sample_indices.shape[0]} rows but obs0 arrays have {n_dense}."
+        )
+    if n_dense == 0:
+        raise ValueError("No dense static observation samples are available.")
+    n_full = int(np.asarray(data["world_delta"]).shape[0])
+    if int(np.min(sample_indices)) < 0 or int(np.max(sample_indices)) >= n_full:
+        raise ValueError("static sample indices contain out-of-range sample IDs.")
+    if len(np.unique(sample_indices)) != len(sample_indices):
+        raise ValueError("static sample indices contain duplicates.")
+    for ch in channels:
+        key = f"obs0_{ch}"
+        if key not in data:
+            raise KeyError(f"Missing dense static observation array {key}.")
+        if int(np.asarray(data[key]).shape[0]) != n_dense:
+            raise ValueError(f"{key} row count does not match {first}.")
     return sample_indices
 
 

@@ -182,3 +182,13 @@ Required scientific guards for Stage B pilots:
 2. Use `--allow-leakage-diagnostic` only for a separately labeled leakage diagnostic, never as primary Stage B evidence.
 3. Include action-only and shuffled controls, including shuffled-strata and shuffled-action controls, when interpreting Stage B results.
 4. Do not treat `edge` as the RGB redundancy control. The primary RGB redundancy controls are `noisy_rgb`, `gray_rgb`, and `blur_rgb`.
+
+For the current Stage B.1 confound-control smoke run:
+
+```bash
+PYTHONPATH=src bash scripts/run_stageb_b1_smoke.sh outputs/stageb_b1_smoke
+```
+
+This adds same-action-type, same-action-id, action-residualized, and
+static-vs-action-effect reports. See `docs/stageb_status.md` for the current
+interpretation and remaining Stage B loopholes.
