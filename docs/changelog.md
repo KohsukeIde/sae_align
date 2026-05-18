@@ -22,6 +22,12 @@
 - Recorded Stage B.4 v1 local CPU grid: identity passed, but same-channel
   reliability and redundancy calibration failed under CI; Stage C remains
   blocked.
+- Added Stage B.5 held-out same-action-set preregistration, analyzer, smoke/v1
+  scripts, and grid summarizer.
+- Recorded Stage B.5 v1 local CPU grid: held-out redundancy controls passed and
+  `pca_probe_only / probe_action_type_apply` showed a partial positive
+  `rgb-range` signal, but the result is representation/normalization dependent;
+  Stage C remains blocked.
 
 ## v0.1.0
 

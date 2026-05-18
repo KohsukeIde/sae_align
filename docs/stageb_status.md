@@ -176,6 +176,36 @@ cross-channel probe-to-heldout alignment interpretable. Next diagnostics should
 separate raw-delta signature reliability, random projection, all-action PCA
 upper bound, held-out split-half, and tie-jitter sensitivity.
 
+## Stage B.5 Held-Out Same-Action-Set Gate
+
+Stage B.5 is recorded in `docs/stageb5_preregistration.md` and
+`docs/stageb5_v1_cpu_experiment.md`. It demotes the B.4 action-subset transfer
+gate and asks whether cross-channel action-effect signatures align when both
+channels use the same held-out action set.
+
+The B.5 v1 CPU result:
+
+```text
+held-out redundancy controls: pass
+pca_probe_only / probe_action_type_apply rgb-range: partial positive
+raw_delta and random_projection diagnostics: weaker
+continuous observability: positive association
+```
+
+Decision:
+
+```text
+Stage B.5 v1: partial positive, not full pass.
+Stage C remains blocked.
+Option 3 remains premature.
+```
+
+The key new evidence is that B.2's weak `rgb-range` signal is not simply gone:
+under `pca_probe_only / probe_action_type_apply`, B.5 mean adjusted overlap is
+about `+0.0447` versus the B.2 reference `+0.0400`. The blocker is that this
+signal is representation/normalization dependent and `pca_probe_only` remains
+tie-heavy.
+
 ## Reproducible Smoke
 
 Run:

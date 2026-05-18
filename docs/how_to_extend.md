@@ -100,6 +100,13 @@ the next work should diagnose raw delta signatures, random projections,
 all-action PCA upper bounds, held-out split-half reliability, and tie-jitter
 sensitivity.
 
+Stage B.5 demotes the B.4 action-subset transfer gate and tests held-out
+same-action-set cross-channel alignment. Read
+`docs/stageb5_preregistration.md` and `docs/stageb5_v1_cpu_experiment.md`.
+B.5 v1 is partial positive under `pca_probe_only / probe_action_type_apply`,
+but the signal is representation/normalization dependent. The next hardening
+steps are tie-jitter sensitivity, all-action PCA upper bound, and k-sensitivity.
+
 ## Add Stage C: selective prediction
 
 Stage C is still too early. Add selective-prediction baselines only after Stage

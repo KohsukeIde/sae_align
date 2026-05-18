@@ -235,4 +235,16 @@ PYTHONPATH=src bash scripts/run_stageb_b4_smoke.sh outputs/stageb_b4_smoke
 Read `docs/stageb4_preregistration.md` and
 `docs/stageb4_v1_cpu_experiment.md`. B.4 v1 did not pass: identity checks
 passed, but same-channel split-half reliability and redundancy calibration
-failed under CI. Stage C remains blocked.
+failed under CI.
+
+For the Stage B.5 held-out same-action-set gate:
+
+```bash
+PYTHONPATH=src bash scripts/run_stageb_b5_smoke.sh outputs/stageb_b5_smoke
+```
+
+Read `docs/stageb5_preregistration.md` and
+`docs/stageb5_v1_cpu_experiment.md`. B.5 v1 is partial positive, not a full
+pass: `pca_probe_only / probe_action_type_apply` recovers a weak `rgb-range`
+signal, but raw/random diagnostics are weaker and the PCA result is tie-heavy.
+Stage C remains blocked.

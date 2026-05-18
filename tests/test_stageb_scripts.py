@@ -483,3 +483,51 @@ def test_state_signature_knn_script_writes_stageb2_reports(tmp_path):
     assert (b4_out / "reports" / "gate_summary_ci.csv").exists()
     b4_summary = json.loads((b4_out / "reports" / "stageb4_summary.json").read_text())
     assert b4_summary["gate_order"][0] == "gate_minus1_identity_same_probe_and_heldout_action"
+
+    b5_out = tmp_path / "stageb5"
+    subprocess.run(
+        [
+            sys.executable,
+            "scripts/analyze_stageb5_heldout_alignment.py",
+            "--data",
+            str(data_path),
+            "--model",
+            str(action_model_dir / "transition_encoders.npz"),
+            "--static-model",
+            str(static_model_dir / "transition_encoders.npz"),
+            "--out",
+            str(b5_out),
+            "--channels",
+            "rgb",
+            "range",
+            "local",
+            "--probe-action-ids",
+            "0",
+            "1",
+            "2",
+            "--representations",
+            "pca_probe_only",
+            "raw_delta",
+            "random_projection",
+            "--k",
+            "2",
+            "--max-states",
+            "5",
+            "--bootstrap-repeats",
+            "5",
+            "--normalization-modes",
+            "none",
+            "probe_global_apply",
+            "probe_action_type_apply",
+        ],
+        check=True,
+        env=env,
+    )
+    assert (b5_out / "reports" / "heldout_same_action_cross_channel_alignment.csv").exists()
+    assert (b5_out / "reports" / "heldout_action_effect_vs_static.csv").exists()
+    assert (b5_out / "reports" / "observability_score_correlation.csv").exists()
+    assert (b5_out / "reports" / "feature_tie_diagnostics.csv").exists()
+    assert (b5_out / "reports" / "b2_signal_comparison.csv").exists()
+    assert (b5_out / "reports" / "gate_summary.csv").exists()
+    b5_summary = json.loads((b5_out / "reports" / "stageb5_summary.json").read_text())
+    assert b5_summary["gate_order"][0] == "gate0_heldout_same_action_redundancy"
