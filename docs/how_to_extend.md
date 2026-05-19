@@ -114,6 +114,11 @@ calibrated CKA/RSA/ridge measurement-primitive sanity checks. Treat all-action
 PCA as transductive diagnostic only. Do not choose the best B.6 cell after
 seeing the grid.
 
+The Stage B.6 v1 CPU result is recorded in
+`docs/stageb6_v1_cpu_experiment.md`. It is a partial robust positive: the
+`rgb-range` signal survives the preregistered primary cell and much of the
+robustness grid, but effect size is still small and binary strata remain weak.
+
 ## Add Stage C: selective prediction
 
 Stage C is still too early. Add selective-prediction baselines only after B.6

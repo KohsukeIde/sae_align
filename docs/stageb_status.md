@@ -240,6 +240,33 @@ Continuous observability is the current working framing, pending B.6.
 Option 3 remains premature.
 ```
 
+B.6 v1 is recorded in `docs/stageb6_v1_cpu_experiment.md`. The full CPU array
+completed 16/16 tasks. The primary replication cell
+`pca_probe_only / probe_action_type_apply / d=32 / k=10 / jitter=0` reproduced
+the B.5 magnitude:
+
+```text
+rgb-range adjusted mean: +0.0437
+rgb-range adjusted min:  +0.0150
+rgb-range positive:      4/4
+redundancy positive:     12/12
+AE > static CI:          3/4
+AE > shuffled CI:        3/4
+detect_geom Spearman:    +0.318
+```
+
+Across the robustness grid, `pca_probe_only / probe_action_type_apply` stayed
+mostly positive for `d=16/32/64/128`, and raw/random diagnostics were positive
+but weaker. The decision is:
+
+```text
+Stage B.6 v1: partial robust positive.
+Stage C: not automatic, but the metric is no longer obviously broken.
+Binary strata framing: weak.
+Continuous action-effect observability framing: strengthened.
+Option 3 remains premature.
+```
+
 ## Reproducible Smoke
 
 Run:

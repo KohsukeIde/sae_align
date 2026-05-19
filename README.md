@@ -260,3 +260,9 @@ signal survives k-sweep, tie-jitter, PCA component sweep, all-action PCA
 diagnostics, and calibrated CKA/RSA/ridge sanity checks. This grid is larger
 than the B.5 pilot; use `scripts/submit_stageb_b6_v1_cpu_array.sh` for the
 CPU array version. GPU is not required.
+
+The Stage B.6 v1 CPU array is recorded in
+`docs/stageb6_v1_cpu_experiment.md`. It is a partial robust positive:
+`rgb-range` remains positive in the preregistered primary cell, continuous
+observability is positively associated with overlap, and raw/random diagnostics
+are positive but weaker. Stage C is still not automatic.

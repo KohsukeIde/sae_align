@@ -31,6 +31,9 @@
 - Added Stage B.6 preregistration, artifact diagnostics, calibrated
   CKA/RSA/ridge measurement sanity checks, k/jitter/PCA-dimension grid runners,
   and ABCI/qsub CPU-array helpers.
+- Recorded Stage B.6 v1 CPU array: the preregistered primary cell reproduced a
+  weak positive `rgb-range` signal and continuous observability association;
+  label is partial robust positive, not full pass.
 
 ## v0.1.0
 
