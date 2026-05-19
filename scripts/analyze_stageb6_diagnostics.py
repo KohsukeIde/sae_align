@@ -94,6 +94,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--batch-size", type=int, default=512)
     p.add_argument("--ridge-alpha", type=float, default=1.0)
     p.add_argument("--ridge-splits", type=int, default=10)
+    p.add_argument("--sanity-knn-k", type=int, default=10)
+    p.add_argument("--svcca-components", type=int, default=32)
+    p.add_argument("--extended-metric-repeats", type=int, default=50)
     p.add_argument("--permutation-repeats", type=int, default=200)
     p.add_argument("--permutation-seed", type=int, default=0)
     p.add_argument("--bootstrap-repeats", type=int, default=200)
@@ -331,6 +334,123 @@ def cosine_similarity_matrix(x: np.ndarray) -> np.ndarray:
     return x @ x.T
 
 
+def directed_knn_adjacency(x: np.ndarray, k: int) -> np.ndarray:
+    x = np.asarray(x, dtype=np.float64)
+    n = int(x.shape[0])
+    kk = max(0, min(int(k), n - 1))
+    adj = np.zeros((n, n), dtype=bool)
+    if n <= 1 or kk == 0:
+        return adj
+    sim = cosine_similarity_matrix(x)
+    np.fill_diagonal(sim, -np.inf)
+    order = np.argsort(-sim, axis=1, kind="mergesort")[:, :kk]
+    rows = np.repeat(np.arange(n), kk)
+    adj[rows, order.reshape(-1)] = True
+    return adj
+
+
+def cycle_knn_overlap_from_adjacency(ax: np.ndarray, ay: np.ndarray) -> float:
+    cx = np.asarray(ax, dtype=bool) & np.asarray(ax, dtype=bool).T
+    cy = np.asarray(ay, dtype=bool) & np.asarray(ay, dtype=bool).T
+    denom = np.maximum(cx.sum(axis=1), 1)
+    values = (cx & cy).sum(axis=1) / denom
+    return float(np.mean(values)) if values.size else float("nan")
+
+
+def cknna_from_adjacency(ax: np.ndarray, ay: np.ndarray) -> float:
+    gx = (np.asarray(ax, dtype=bool) | np.asarray(ax, dtype=bool).T).astype(np.float64)
+    gy = (np.asarray(ay, dtype=bool) | np.asarray(ay, dtype=bool).T).astype(np.float64)
+    return linear_cka_from_grams(center_graph(gx), center_graph(gy))
+
+
+def center_graph(a: np.ndarray) -> np.ndarray:
+    a = np.asarray(a, dtype=np.float64)
+    return a - a.mean(axis=0, keepdims=True) - a.mean(axis=1, keepdims=True) + float(a.mean())
+
+
+def calibrated_cycle_knn(
+    x: np.ndarray,
+    y: np.ndarray,
+    *,
+    k: int,
+    repeats: int,
+    seed: int,
+) -> tuple[float, dict[str, object]]:
+    ax = directed_knn_adjacency(x, k=int(k))
+    ay = directed_knn_adjacency(y, k=int(k))
+    observed = cycle_knn_overlap_from_adjacency(ax, ay)
+    rng = np.random.default_rng(int(seed))
+    null = []
+    for _ in range(int(repeats)):
+        perm = rng.permutation(ay.shape[0])
+        null.append(cycle_knn_overlap_from_adjacency(ax, ay[np.ix_(perm, perm)]))
+    return observed, calibration_fields(observed, null)
+
+
+def calibrated_cknna(
+    x: np.ndarray,
+    y: np.ndarray,
+    *,
+    k: int,
+    repeats: int,
+    seed: int,
+) -> tuple[float, dict[str, object]]:
+    ax = directed_knn_adjacency(x, k=int(k))
+    ay = directed_knn_adjacency(y, k=int(k))
+    observed = cknna_from_adjacency(ax, ay)
+    rng = np.random.default_rng(int(seed))
+    null = []
+    for _ in range(int(repeats)):
+        perm = rng.permutation(ay.shape[0])
+        null.append(cknna_from_adjacency(ax, ay[np.ix_(perm, perm)]))
+    return observed, calibration_fields(observed, null)
+
+
+def canonical_correlations(
+    x: np.ndarray,
+    y: np.ndarray,
+    *,
+    components: int,
+    eps: float = 1e-7,
+) -> np.ndarray:
+    x = center(np.asarray(x, dtype=np.float64))
+    y = center(np.asarray(y, dtype=np.float64))
+    if x.shape[0] != y.shape[0] or x.shape[0] < 3:
+        return np.asarray([], dtype=np.float64)
+    ux, sx, _ = np.linalg.svd(x, full_matrices=False)
+    uy, sy, _ = np.linalg.svd(y, full_matrices=False)
+    if sx.size == 0 or sy.size == 0:
+        return np.asarray([], dtype=np.float64)
+    keep_x = sx > float(eps) * max(float(sx[0]), 1.0)
+    keep_y = sy > float(eps) * max(float(sy[0]), 1.0)
+    max_rank = max(1, int(components))
+    ux = ux[:, keep_x][:, :max_rank]
+    uy = uy[:, keep_y][:, :max_rank]
+    if ux.shape[1] == 0 or uy.shape[1] == 0:
+        return np.asarray([], dtype=np.float64)
+    corr_values = np.linalg.svd(ux.T @ uy, compute_uv=False)
+    return np.clip(np.asarray(corr_values, dtype=np.float64), 0.0, 1.0)
+
+
+def calibrated_svcca_mean(
+    x: np.ndarray,
+    y: np.ndarray,
+    *,
+    components: int,
+    repeats: int,
+    seed: int,
+) -> tuple[float, int, dict[str, object]]:
+    values = canonical_correlations(x, y, components=int(components))
+    observed = float(values.mean()) if values.size else float("nan")
+    rng = np.random.default_rng(int(seed))
+    null = []
+    for _ in range(int(repeats)):
+        perm = rng.permutation(y.shape[0])
+        shuffled = canonical_correlations(x, y[perm], components=int(components))
+        null.append(float(shuffled.mean()) if shuffled.size else float("nan"))
+    return observed, int(values.size), calibration_fields(observed, null)
+
+
 def rsa_spearman(x: np.ndarray, y: np.ndarray) -> tuple[float, int]:
     if x.shape[0] != y.shape[0] or x.shape[0] < 3:
         return float("nan"), int(min(x.shape[0], y.shape[0]))
@@ -488,6 +608,9 @@ def sanity_rows_for_features(
     pairs: Sequence[tuple[str, str]],
     ridge_alpha: float,
     ridge_splits: int,
+    sanity_knn_k: int,
+    svcca_components: int,
+    extended_metric_repeats: int,
     permutation_repeats: int,
     seed: int,
     control_feature_source: str,
@@ -555,6 +678,9 @@ def sanity_rows_for_features(
                 "value": cka_value,
                 "std": float("nan"),
                 "n": int(x.shape[0]),
+                "sanity_knn_k": int(sanity_knn_k),
+                "svcca_components": int(svcca_components),
+                "extended_metric_repeats": int(extended_metric_repeats),
                 "ridge_alpha": float(ridge_alpha),
                 "ridge_splits": int(ridge_splits),
                 "permutation_repeats": int(permutation_repeats),
@@ -577,6 +703,9 @@ def sanity_rows_for_features(
                 "value": rsa_value,
                 "std": float("nan"),
                 "n": int(rsa_n),
+                "sanity_knn_k": int(sanity_knn_k),
+                "svcca_components": int(svcca_components),
+                "extended_metric_repeats": int(extended_metric_repeats),
                 "ridge_alpha": float(ridge_alpha),
                 "ridge_splits": int(ridge_splits),
                 "permutation_repeats": int(permutation_repeats),
@@ -599,6 +728,9 @@ def sanity_rows_for_features(
                 "value": r2,
                 "std": r2_std,
                 "n": int(x.shape[0]),
+                "sanity_knn_k": int(sanity_knn_k),
+                "svcca_components": int(svcca_components),
+                "extended_metric_repeats": int(extended_metric_repeats),
                 "ridge_alpha": float(ridge_alpha),
                 "ridge_splits": int(ridge_splits),
                 "permutation_repeats": int(permutation_repeats),
@@ -621,6 +753,9 @@ def sanity_rows_for_features(
                 "value": r2_reverse,
                 "std": r2_reverse_std,
                 "n": int(y.shape[0]),
+                "sanity_knn_k": int(sanity_knn_k),
+                "svcca_components": int(svcca_components),
+                "extended_metric_repeats": int(extended_metric_repeats),
                 "ridge_alpha": float(ridge_alpha),
                 "ridge_splits": int(ridge_splits),
                 "permutation_repeats": int(permutation_repeats),
@@ -668,12 +803,98 @@ def sanity_rows_for_features(
                 "value": observed,
                 "std": float(clean.std(ddof=0)) if clean.size else float("nan"),
                 "n": int(len(action_values)),
+                "sanity_knn_k": int(sanity_knn_k),
+                "svcca_components": int(svcca_components),
+                "extended_metric_repeats": int(extended_metric_repeats),
                 "ridge_alpha": float(ridge_alpha),
                 "ridge_splits": int(ridge_splits),
                 "permutation_repeats": int(permutation_repeats),
                 **calibration_fields(observed, action_null_values),
             }
         )
+    return rows
+
+
+def literature_metric_rows_for_features(
+    *,
+    representation: str,
+    representation_components: int,
+    control: str,
+    normalization: str,
+    features: Mapping[str, np.ndarray],
+    pairs: Sequence[tuple[str, str]],
+    sanity_knn_k: int,
+    svcca_components: int,
+    repeats: int,
+    seed: int,
+    control_feature_source: str,
+) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for a, b in pairs:
+        if a not in features or b not in features:
+            continue
+        x = np.asarray(features[a], dtype=np.float32)
+        y = np.asarray(features[b], dtype=np.float32)
+        cycle_value, cycle_calibration = calibrated_cycle_knn(
+            x,
+            y,
+            k=int(sanity_knn_k),
+            repeats=int(repeats),
+            seed=int(seed) + 251,
+        )
+        cknna_value, cknna_calibration = calibrated_cknna(
+            x,
+            y,
+            k=int(sanity_knn_k),
+            repeats=int(repeats),
+            seed=int(seed) + 252,
+        )
+        svcca_value, svcca_n, svcca_calibration = calibrated_svcca_mean(
+            x,
+            y,
+            components=int(svcca_components),
+            repeats=int(repeats),
+            seed=int(seed) + 253,
+        )
+        full_cca_components = max(1, min(int(x.shape[0] - 1), int(x.shape[1]), int(y.shape[1])))
+        cca_value, cca_n, cca_calibration = calibrated_svcca_mean(
+            x,
+            y,
+            components=full_cca_components,
+            repeats=int(repeats),
+            seed=int(seed) + 254,
+        )
+        for measurement, value, n_value, components, calibration in [
+            ("cycle_knn_overlap", cycle_value, int(x.shape[0]), int(sanity_knn_k), cycle_calibration),
+            ("cknna_linear_cka", cknna_value, int(x.shape[0]), int(sanity_knn_k), cknna_calibration),
+            ("svcca_mean_corr", svcca_value, int(svcca_n), int(svcca_components), svcca_calibration),
+            ("cca_mean_corr", cca_value, int(cca_n), int(full_cca_components), cca_calibration),
+        ]:
+            rows.append(
+                {
+                    "representation": representation,
+                    "representation_components": int(representation_components),
+                    **representation_flags(representation),
+                    "control": control,
+                    "control_feature_source": control_feature_source,
+                    "normalization": normalization,
+                    "channel_a": a,
+                    "channel_b": b,
+                    "channel_a_dim": int(x.shape[1]),
+                    "channel_b_dim": int(y.shape[1]),
+                    "measurement": measurement,
+                    "value": value,
+                    "std": float("nan"),
+                    "n": int(n_value),
+                    "metric_parameter": int(components),
+                    "sanity_knn_k": int(sanity_knn_k),
+                    "svcca_components": int(svcca_components),
+                    "permutation_repeats": int(repeats),
+                    "diagnostic_only": True,
+                    "primary_gate_eligible": False,
+                    **calibration,
+                }
+            )
     return rows
 
 
@@ -734,8 +955,9 @@ def main() -> None:
     if probe_pos.size == 0 or heldout_pos.size == 0:
         raise ValueError("Probe split must select at least one action and leave held-out actions.")
     full_action_types = np.asarray(data["action_type"]).astype(str)[full_rows[0]]
+    requested_norms = [str(x) for x in args.normalization_modes]
     missing_probe_types = sorted(set(full_action_types[heldout_pos].tolist()) - set(full_action_types[probe_pos].tolist()))
-    if missing_probe_types:
+    if "probe_action_type_apply" in requested_norms and missing_probe_types:
         raise ValueError(
             "Held-out actions contain action types absent from probe actions; "
             f"probe_action_type_apply would be ill-defined: {missing_probe_types}"
@@ -827,6 +1049,7 @@ def main() -> None:
     corr_rows: list[dict[str, object]] = []
     tie_rows: list[dict[str, object]] = []
     sanity_rows: list[dict[str, object]] = []
+    literature_metric_rows: list[dict[str, object]] = []
     diff_rows: list[dict[str, object]] = []
     rng = np.random.default_rng(int(args.bootstrap_seed))
 
@@ -878,8 +1101,26 @@ def main() -> None:
                     pairs=sanity_pairs,
                     ridge_alpha=float(args.ridge_alpha),
                     ridge_splits=int(args.ridge_splits),
+                    sanity_knn_k=int(args.sanity_knn_k),
+                    svcca_components=int(args.svcca_components),
+                    extended_metric_repeats=int(args.extended_metric_repeats),
                     permutation_repeats=int(args.permutation_repeats),
                     seed=int(args.permutation_seed) + int(args.seed) * 1009 + 9001,
+                    control_feature_source="state_flat_action_effect",
+                )
+            )
+            literature_metric_rows.extend(
+                literature_metric_rows_for_features(
+                    representation=rep,
+                    representation_components=representation_components.get(rep, 0),
+                    control="action_effect_heldout_signature",
+                    normalization=norm,
+                    features=features,
+                    pairs=sanity_pairs,
+                    sanity_knn_k=int(args.sanity_knn_k),
+                    svcca_components=int(args.svcca_components),
+                    repeats=int(args.extended_metric_repeats),
+                    seed=int(args.permutation_seed) + int(args.seed) * 1009 + 9101,
                     control_feature_source="state_flat_action_effect",
                 )
             )
@@ -897,8 +1138,26 @@ def main() -> None:
                     pairs=sanity_pairs,
                     ridge_alpha=float(args.ridge_alpha),
                     ridge_splits=int(args.ridge_splits),
+                    sanity_knn_k=int(args.sanity_knn_k),
+                    svcca_components=int(args.svcca_components),
+                    extended_metric_repeats=int(args.extended_metric_repeats),
                     permutation_repeats=int(args.permutation_repeats),
                     seed=int(args.permutation_seed) + int(args.seed) * 1009 + 9002,
+                    control_feature_source="state_flat_static",
+                )
+            )
+            literature_metric_rows.extend(
+                literature_metric_rows_for_features(
+                    representation=rep,
+                    representation_components=representation_components.get(rep, 0),
+                    control="static_heldout_signature",
+                    normalization=norm,
+                    features=static_features,
+                    pairs=sanity_pairs,
+                    sanity_knn_k=int(args.sanity_knn_k),
+                    svcca_components=int(args.svcca_components),
+                    repeats=int(args.extended_metric_repeats),
+                    seed=int(args.permutation_seed) + int(args.seed) * 1009 + 9102,
                     control_feature_source="state_flat_static",
                 )
             )
@@ -916,8 +1175,26 @@ def main() -> None:
                     pairs=sanity_pairs,
                     ridge_alpha=float(args.ridge_alpha),
                     ridge_splits=int(args.ridge_splits),
+                    sanity_knn_k=int(args.sanity_knn_k),
+                    svcca_components=int(args.svcca_components),
+                    extended_metric_repeats=int(args.extended_metric_repeats),
                     permutation_repeats=int(args.permutation_repeats),
                     seed=int(args.permutation_seed) + int(args.seed) * 1009 + 9003,
+                    control_feature_source="state_flat_normalized_then_action_shuffled",
+                )
+            )
+            literature_metric_rows.extend(
+                literature_metric_rows_for_features(
+                    representation=rep,
+                    representation_components=representation_components.get(rep, 0),
+                    control="action_column_shuffled_heldout",
+                    normalization=norm,
+                    features=shuffled,
+                    pairs=sanity_pairs,
+                    sanity_knn_k=int(args.sanity_knn_k),
+                    svcca_components=int(args.svcca_components),
+                    repeats=int(args.extended_metric_repeats),
+                    seed=int(args.permutation_seed) + int(args.seed) * 1009 + 9103,
                     control_feature_source="state_flat_normalized_then_action_shuffled",
                 )
             )
@@ -1037,6 +1314,7 @@ def main() -> None:
     write_csv(reports / "b6_observability_score_correlation_by_k_jitter.csv", corr_rows)
     write_csv(reports / "b6_feature_tie_by_k_jitter.csv", tie_rows)
     write_csv(reports / "b6_measurement_sanity.csv", sanity_rows)
+    write_csv(reports / "b6_literature_metrics.csv", literature_metric_rows)
     write_csv(reports / "b6_decision_summary.csv", decision_summary_rows(sensitivity_rows))
     save_json(
         {
@@ -1051,6 +1329,9 @@ def main() -> None:
             "jitter_epsilons": [float(x) for x in args.jitter_epsilons],
             "jitter_seeds": [int(x) for x in args.jitter_seeds],
             "permutation_repeats": int(args.permutation_repeats),
+            "extended_metric_repeats": int(args.extended_metric_repeats),
+            "sanity_knn_k": int(args.sanity_knn_k),
+            "svcca_components": int(args.svcca_components),
             "n_states": int(state_ids.shape[0]),
             "n_probe_actions": int(probe_pos.size),
             "n_heldout_actions": int(heldout_pos.size),

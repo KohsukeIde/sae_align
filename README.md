@@ -12,7 +12,7 @@ The goal of this first phase is *not* to train a full world model or reproduce D
 4. Derived diagnostics such as edge maps are interpreted separately from redundancy controls.
 5. We can later use these strata for stratified action-effect alignment and selective prediction.
 
-The repository is designed to be extended incrementally. Stage 0 is implemented, and the NumPy Stage B action-effect kNN pipeline is available for pilot diagnostics. Current Stage 0/B pilots are NumPy-only CPU runs and do not require qsub, a GPU, or CUDA. Stage C is still too early; the current blocker is Stage B.4 split-half reliability for state-level action-effect signatures.
+The repository is designed to be extended incrementally. Stage 0 is implemented, and the NumPy Stage B action-effect kNN pipeline is available for pilot diagnostics. Stage B.6 v1 is a partial robust positive: the metric is no longer obviously broken, but the effect size is still small and binary strata remain weak. Full Stage C / PSP-like comparison is still premature; the next prediction step is a separate Stage C0 minimal smoke, while this repo work continues B.6 primary-cell replication and diagnostic metrics.
 
 ---
 
@@ -55,6 +55,7 @@ Implemented now:
 - Stage B.1 confound-control smoke reports for action-restricted, action-residualized, and static-vs-action-effect comparisons;
 - Stage B.2 state-level action-effect signature smoke/pilot reports with full-state dense sampling, probe-action encoder training, held-out action scoring, and static baselines.
 - Stage B.3/B.4 calibration reports for redundancy transfer, normalization, same-channel split-half reliability, and feature tie diagnostics.
+- Stage B.5/B.6 held-out same-action-set reports, artifact diagnostics, and literature-derived diagnostic metrics.
 
 Not implemented yet:
 
@@ -196,10 +197,11 @@ This adds same-action-type, same-action-id, action-residualized, and
 static-vs-action-effect reports. See `docs/stageb_status.md` for the current
 interpretation and remaining Stage B loopholes.
 
-The current priority is Stage B.4 reliability hardening: before interpreting
-`rgb-range`, first show that same-channel state-level action-effect signatures
-are stable across probe/held-out action splits. Do this before Stage C selective
-prediction or world-model baselines.
+The current priority is B.6 hardening plus a separate Stage C0 handoff. B.6
+continues to test whether the weak `rgb-range` action-effect signal survives
+larger primary-cell replication and diagnostic metrics. Full Stage C / PSP-like
+comparison should wait; Stage C0 is the minimal prediction smoke and is kept
+separate from the B.6 metric/pass labels.
 
 For a minimal Stage B.2 smoke run:
 
@@ -268,3 +270,29 @@ The Stage B.6 v1 CPU array is recorded in
 `rgb-range` remains positive in the preregistered primary cell, continuous
 observability is positively associated with overlap, and raw/random diagnostics
 are positive but weaker. Stage C is still not automatic.
+
+For the B.6 primary-cell larger replication:
+
+```bash
+bash scripts/submit_stageb_b6_primary_cell_v1_cpu_array.sh
+```
+
+This submits an ABCI CPU array over `3 data seeds x 3 split seeds x 2 PCA
+dims`. It keeps the literature-derived metrics diagnostic-only in
+`b6_literature_metrics.csv`; they are not mixed into the existing B.6 primary
+summary.
+
+After the array finishes, aggregate with the expected-task guard:
+
+```bash
+PYTHONPATH=src python scripts/summarize_stageb6_grid.py \
+  --root outputs/stageb_b6_primary_cell_v1_cpu \
+  --out outputs/stageb_b6_primary_cell_v1_cpu \
+  --expected-report-dirs 18
+```
+
+The completed run is recorded in
+`docs/stageb6_primary_cell_v1_cpu_experiment.md`: the fixed `d=32/k=10`
+primary cell stayed positive in `9/9` runs, with `rgb-range` adjusted mean
+`+0.0275`, redundancy positives `27/27`, and CKNNA as the cleanest
+diagnostic-only literature metric.

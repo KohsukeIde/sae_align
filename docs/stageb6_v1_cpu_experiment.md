@@ -118,8 +118,10 @@ The literature-method notes behind these choices are in
 papers use different alignment primitives: raw mutual kNN and gallery-density
 stress tests, permutation-calibrated metric families including mKNN/cycle-kNN/
 CKNNA/CKA/RSA, and CCA/subspace-plus-retrieval alignment for 3D-text features.
-Stage B.6 covers only the subset already implemented in this repo; cycle-kNN,
-CKNNA, and CCA remain future diagnostics.
+Stage B.6 v1 covered only the subset implemented at that time. After B.6 v1,
+diagnostic-only cycle-kNN, CKNNA, CCA, and SVCCA rows were added in a separate
+`b6_literature_metrics.csv` output. They are not part of the B.6 v1 primary
+summary.
 
 For the primary replication cell
 `pca_probe_only / probe_action_type_apply / d=32`, `rgb-range` measurement

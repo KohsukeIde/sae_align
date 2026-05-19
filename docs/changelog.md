@@ -38,6 +38,13 @@
 - Recorded Stage B.6 v1 CPU array: the preregistered primary cell reproduced a
   weak positive `rgb-range` signal and continuous observability association;
   label is partial robust positive, not full pass.
+- Added diagnostic-only Stage B.6 literature metrics: cycle-kNN, CKNNA,
+  CCA, and SVCCA, written separately from `b6_measurement_sanity.csv`.
+- Added B.6 primary-cell larger CPU-array scripts for `3 x 3` seed/split
+  replication over PCA dims `16` and `32` with 256 complete states.
+- Recorded the B.6 primary-cell larger CPU experiment: 18/18 tasks completed,
+  fixed `d=32/k=10/jitter=0` primary cell stayed positive in 9/9 runs, and
+  CKNNA provided the cleanest diagnostic support among literature metrics.
 
 ## v0.1.0
 

@@ -22,6 +22,7 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser()
     p.add_argument("--root", type=str, required=True)
     p.add_argument("--out", type=str, default=None)
+    p.add_argument("--expected-report-dirs", type=int, default=None)
     return p.parse_args()
 
 
@@ -205,9 +206,21 @@ def aggregate_primary_cell(
         and row.get("channel_b") == "range"
         and row.get("control") == "action_effect_heldout_signature"
     ]
+    sanity_nonridge = [
+        row
+        for row in sanity
+        if "ridge" not in str(row.get("measurement", "")).lower()
+    ]
+    sanity_ridge = [
+        row
+        for row in sanity
+        if "ridge" in str(row.get("measurement", "")).lower()
+    ]
     rgb_values = finite_values(rgb_range, "chance_adjusted_overlap")
     obs_values = finite_values(obs, "spearman")
-    sanity_values = finite_values(sanity, "calibrated_score")
+    sanity_values = finite_values(sanity_nonridge, "calibrated_score")
+    sanity_all_values = finite_values(sanity, "calibrated_score")
+    sanity_ridge_values = finite_values(sanity_ridge, "calibrated_score")
     return [
         {
             "primary_replication_cell": f"{PRIMARY_REPRESENTATION}/{PRIMARY_NORMALIZATION}/d{PRIMARY_COMPONENTS}/k{PRIMARY_K}/jitter0",
@@ -232,6 +245,12 @@ def aggregate_primary_cell(
             ),
             "detect_geom_spearman_mean": float(obs_values.mean()) if obs_values.size else float("nan"),
             "measurement_sanity_calibrated_mean": float(sanity_values.mean()) if sanity_values.size else float("nan"),
+            "measurement_sanity_all_calibrated_mean": float(sanity_all_values.mean())
+            if sanity_all_values.size
+            else float("nan"),
+            "ridge_sanity_calibrated_mean": float(sanity_ridge_values.mean())
+            if sanity_ridge_values.size
+            else float("nan"),
         }
     ]
 
@@ -241,11 +260,17 @@ def main() -> None:
     root = Path(args.root)
     out = Path(args.out) if args.out else root
     report_dirs = sorted(root.glob("seed_*/split_*/pca_*/stageb6_diagnostics/reports"))
+    if args.expected_report_dirs is not None and len(report_dirs) != int(args.expected_report_dirs):
+        raise RuntimeError(
+            f"Expected {int(args.expected_report_dirs)} Stage B.6 report dirs under {root}, "
+            f"found {len(report_dirs)}. Refusing to aggregate an incomplete grid."
+        )
     knn_rows: list[dict[str, object]] = []
     diff_rows: list[dict[str, object]] = []
     corr_rows: list[dict[str, object]] = []
     tie_rows: list[dict[str, object]] = []
     sanity_rows: list[dict[str, object]] = []
+    literature_rows: list[dict[str, object]] = []
     decision_rows: list[dict[str, object]] = []
     for report_dir in report_dirs:
         meta = run_metadata(report_dir, root)
@@ -255,6 +280,7 @@ def main() -> None:
             ("b6_observability_score_correlation_by_k_jitter.csv", corr_rows),
             ("b6_feature_tie_by_k_jitter.csv", tie_rows),
             ("b6_measurement_sanity.csv", sanity_rows),
+            ("b6_literature_metrics.csv", literature_rows),
             ("b6_decision_summary.csv", decision_rows),
         ]:
             path = report_dir / name
@@ -267,6 +293,7 @@ def main() -> None:
     write_csv(out / "stageb6_observability_score_correlation.csv", corr_rows)
     write_csv(out / "stageb6_feature_tie_by_k_jitter.csv", tie_rows)
     write_csv(out / "stageb6_measurement_sanity.csv", sanity_rows)
+    write_csv(out / "stageb6_literature_metrics.csv", literature_rows)
     write_csv(out / "stageb6_run_decision_summary.csv", decision_rows)
 
     aggregate_rows = aggregate_decisions(knn_rows, diff_rows)
@@ -280,6 +307,7 @@ def main() -> None:
         "n_diff_rows": int(len(diff_rows)),
         "n_corr_rows": int(len(corr_rows)),
         "n_sanity_rows": int(len(sanity_rows)),
+        "n_literature_metric_rows": int(len(literature_rows)),
         "primary_cell": primary_rows[0] if primary_rows else {},
         "notes": [
             "B.6 is diagnostic. Do not pick the best cell as primary evidence.",

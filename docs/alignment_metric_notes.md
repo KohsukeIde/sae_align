@@ -28,6 +28,26 @@ No subagent was asked to use search as a discovery engine for additional
 papers. Additional literature should be added through an explicit fixed-paper
 review task or through references that are deliberately promoted into scope.
 
+## Subagent Work Products
+
+The fixed-paper review and implementation audit were split into separate
+high-load tasks:
+
+- literature-method extraction: identify the exact neighborhood, graph, and
+  subspace alignment primitives in `2604.18572`, `2602.14486`, and
+  `2503.05283`;
+- implementation design: decide which primitives can be added without changing
+  the preregistered B.6 primary gate;
+- code review: check that new diagnostics cannot contaminate primary
+  summaries;
+- loophole audit: list circularity, split leakage, transductive subspace, and
+  stale/incomplete-grid risks.
+
+The resulting implementation keeps the literature-derived metrics separate from
+the primary B.6 CSVs. Cycle-kNN, CKNNA, CCA, and SVCCA are written to
+`b6_literature_metrics.csv`, and the primary summary remains based on the
+precommitted heldout-to-heldout kNN grid.
+
 ## Papers Checked
 
 ### Back into Plato's Cave
@@ -108,8 +128,9 @@ Mapping to this repo:
   - action-conditioned RSA over held-out actions.
 - B.6 interprets these only as sanity diagnostics. They are not promoted to a
   final claim unless the kNN and control evidence also behave sensibly.
-- B.6 does not yet implement cycle-kNN or CKNNA. Those are future hardening
-  targets if kNN remains close to the noise floor.
+- After B.6 v1, diagnostic-only cycle-kNN and CKNNA rows were added in
+  `b6_literature_metrics.csv`. They are not part of the preregistered primary
+  gate.
 
 ### Escaping Plato's Cave
 
@@ -143,8 +164,10 @@ Mapping to this repo:
   bound, never as primary evidence.
 - Stage B.6 includes `raw_delta` and `random_projection` as controls to check
   whether the PCA signal is a denoising/subspace effect or an artifact.
-- CCA is not yet implemented. If B.6 remains only weakly positive, a fixed
-  probe-only CCA/SVCCA diagnostic is a reasonable next measurement primitive.
+- CCA and SVCCA are now implemented as diagnostic-only rows in
+  `b6_literature_metrics.csv`. They are not primary evidence because subspace
+  metrics can stay positive under some controls and can become circular if
+  fitted on evaluation data.
 
 ## Current Loopholes
 
@@ -175,8 +198,9 @@ Stage B.6 currently implements only a subset:
 - implemented: heldout-to-heldout kNN overlap, k-sweep, jitter, PCA component
   sweep, raw/random diagnostics, calibrated state-flat CKA/RSA/ridge, and
   action-conditioned RSA;
-- not implemented: cycle-kNN, CKNNA, CCA/SVCCA/PWCCA, local CKA retrieval, or
-  retrieval/matching metrics.
+- implemented as diagnostic-only additions after B.6 v1: cycle-kNN, CKNNA,
+  CCA, and SVCCA, written separately to `b6_literature_metrics.csv`;
+- not implemented: PWCCA, local CKA retrieval, or retrieval/matching metrics.
 
 Therefore, Stage B.6 should be described as a kNN-plus-sanity diagnostic, not
 as a full reproduction of the PRH metric suite or the 3D-text subspace
@@ -188,6 +212,8 @@ alignment pipeline.
   alignment setup.
 - Keep k-sweep, jitter, and PCA-dimension sweep in the B.6 diagnostic grid.
 - Keep calibrated CKA/RSA/ridge as measurement sanity checks, not final claims.
+- Keep cycle-kNN, CKNNA, CCA, and SVCCA diagnostic-only unless a later
+  preregistration promotes them.
 - Treat `pca_all_action` as diagnostic only.
 - Treat continuous observability as the current working framing; binary
   regular/blind strata are secondary until stronger evidence appears.
@@ -196,8 +222,6 @@ alignment pipeline.
 
 If Stage B remains weak but nonzero, the next method additions should be:
 
-- cycle-kNN as a stricter bidirectional-neighborhood control;
-- CKNNA as a graph-neighborhood analogue of CKA;
-- probe-only CCA/SVCCA/PWCCA diagnostics for shared action-effect subspaces;
+- PWCCA diagnostics for shared action-effect subspaces;
 - retrieval-style evaluations over action-effect signatures, inspired by the
   3D-text matching/retrieval setup, but with precommitted action/state splits.

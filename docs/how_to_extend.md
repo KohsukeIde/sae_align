@@ -92,13 +92,12 @@ The B.3 reports test balanced action splits, non-transductive normalization,
 held-out static/shuffled controls, redundancy probe-to-heldout calibration, and
 continuous observability scores.
 
-Stage B.4 is now the active blocker. Read `docs/stageb4_preregistration.md` and
+Stage B.4 is no longer the active blocker, but it remains an important
+diagnostic record. Read `docs/stageb4_preregistration.md` and
 `docs/stageb4_v1_cpu_experiment.md`. B.4 checks whether same-channel
 state-level action-effect signatures are reliable across probe/held-out actions
 before any cross-channel claim. B.4 v1 failed at same-channel reliability, so
-the next work should diagnose raw delta signatures, random projections,
-all-action PCA upper bounds, held-out split-half reliability, and tie-jitter
-sensitivity.
+the project demoted action-subset transfer from the primary gate.
 
 Stage B.5 demotes the B.4 action-subset transfer gate and tests held-out
 same-action-set cross-channel alignment. Read
@@ -119,11 +118,25 @@ The Stage B.6 v1 CPU result is recorded in
 `rgb-range` signal survives the preregistered primary cell and much of the
 robustness grid, but effect size is still small and binary strata remain weak.
 
+The current B.6 extension adds:
+
+- a larger primary-cell CPU array over `3 x 3` seeds and `d in {16, 32}`;
+- diagnostic-only literature metrics: cycle-kNN, CKNNA, CCA, and SVCCA;
+- a separate `b6_literature_metrics.csv` output so the B.6 primary summary is
+  not changed by newly added exploratory metrics.
+
+The larger primary-cell run is recorded in
+`docs/stageb6_primary_cell_v1_cpu_experiment.md`. It is positive but weak:
+`rgb-range` is positive in `9/9` fixed-primary runs, while effect size remains
+small. Treat this as enough to justify Stage C0, not enough for full Stage C.
+
 ## Add Stage C: selective prediction
 
-Stage C is still too early. Add selective-prediction baselines only after B.6
-shows that the held-out same-action-set `rgb-range` signal is stable across
-k, jitter, PCA dimension, and measurement-primitive diagnostics.
+Full Stage C is still too early. Stage C0, a minimal selective-prediction smoke,
+is now justified but should remain separate from B.6. Do not mix Stage C0
+results into B.6 metric/pass labels. Add full PSP-like selective-prediction
+baselines only after Stage C0 shows behavioral utility for continuous
+observability weighting.
 
 Create:
 

@@ -5,6 +5,12 @@ import sys
 
 import numpy as np
 
+from scripts.analyze_stageb6_diagnostics import (
+    calibrated_cknna,
+    calibrated_cycle_knn,
+    calibrated_svcca_mean,
+)
+
 
 def test_stageb_scripts_default_to_nonleakage_channels(tmp_path):
     rng = np.random.default_rng(0)
@@ -257,6 +263,40 @@ def test_static_action_effect_compare_script_writes_gain_table(tmp_path):
     assert summary["channels"] == ["rgb", "range", "local"]
     assert summary["n_points"] == 10
     assert summary["same_state_static_neighbors_excluded"]
+
+
+def test_stageb6_literature_metrics_identical_features_are_positive():
+    rng = np.random.default_rng(42)
+    x = rng.normal(size=(24, 8)).astype(np.float32)
+    y = x.copy()
+
+    cycle, cycle_cal = calibrated_cycle_knn(x, y, k=4, repeats=20, seed=0)
+    cknna, cknna_cal = calibrated_cknna(x, y, k=4, repeats=20, seed=1)
+    svcca, n_corrs, svcca_cal = calibrated_svcca_mean(x, y, components=6, repeats=20, seed=2)
+
+    assert cycle > 0.95
+    assert cknna > 0.95
+    assert svcca > 0.95
+    assert n_corrs >= 1
+    assert cycle_cal["calibrated_score"] > 0.0
+    assert cknna_cal["calibrated_score"] > 0.0
+    assert svcca_cal["calibrated_score"] > 0.0
+
+
+def test_stageb6_literature_metrics_permutation_null_is_lower():
+    rng = np.random.default_rng(43)
+    x = rng.normal(size=(32, 10)).astype(np.float32)
+    y = x @ rng.normal(size=(10, 7)).astype(np.float32)
+    y += 0.01 * rng.normal(size=y.shape).astype(np.float32)
+    y_bad = y[rng.permutation(y.shape[0])]
+
+    good_cycle, _ = calibrated_cycle_knn(x, y, k=5, repeats=10, seed=3)
+    bad_cycle, _ = calibrated_cycle_knn(x, y_bad, k=5, repeats=10, seed=3)
+    good_cka, _ = calibrated_cknna(x, y, k=5, repeats=10, seed=4)
+    bad_cka, _ = calibrated_cknna(x, y_bad, k=5, repeats=10, seed=4)
+
+    assert good_cycle > bad_cycle
+    assert good_cka > bad_cka
 
 
 def test_state_signature_knn_script_writes_stageb2_reports(tmp_path):

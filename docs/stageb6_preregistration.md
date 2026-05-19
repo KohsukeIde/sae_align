@@ -132,5 +132,39 @@ The specific literature-method mapping is recorded in
 | Paper | Metric lesson | B.6 implementation | Not implemented |
 | --- | --- | --- | --- |
 | `2604.18572` | raw mutual kNN depends on gallery density, `k`, and one-to-one assumptions | heldout-to-heldout kNN, k-sweep, chance adjustment | dense-gallery scaling |
-| `2602.14486` | raw metrics need permutation-null calibration; mKNN, cycle-kNN, CKNNA, CKA/RSA answer different questions | calibrated CKA/RSA/ridge sanity checks, kNN overlap | cycle-kNN, CKNNA, full PRH metric suite |
-| `2503.05283` | useful alignment can live in a correlated low-dimensional subspace | probe-only PCA, all-action PCA diagnostic, raw/random controls | CCA/SVCCA/PWCCA, local CKA retrieval |
+| `2602.14486` | raw metrics need permutation-null calibration; mKNN, cycle-kNN, CKNNA, CKA/RSA answer different questions | calibrated CKA/RSA/ridge sanity checks, kNN overlap, diagnostic cycle-kNN and CKNNA | full PRH metric suite |
+| `2503.05283` | useful alignment can live in a correlated low-dimensional subspace | probe-only PCA, all-action PCA diagnostic, raw/random controls, diagnostic CCA/SVCCA | PWCCA, local CKA retrieval |
+
+After B.6 v1, the implementation adds diagnostic-only cycle-kNN, CKNNA, CCA,
+and SVCCA rows. They are written separately to `b6_literature_metrics.csv`.
+They do not change the preregistered B.6 primary cell and are not counted in
+`stageb6_primary_cell_summary.csv`.
+
+## B.6 Primary-Cell Larger Replication
+
+The larger B.6 replication keeps the B.6 v1 primary logic but increases the
+primary cell scale:
+
+```text
+data seeds: 0, 1, 2
+split seeds: 17, 29, 43
+PCA dims: 16, 32
+analyzed complete states: 256
+representation: pca_probe_only
+normalization: probe_action_type_apply
+k values: 5, 10, 20
+jitter epsilons: 0, 1e-5, 1e-4
+```
+
+Loophole controls:
+
+- `MAX_DELTA_SAMPLES` must cover `N_STATES x K_ACTIONS` for complete-state
+  analysis.
+- The output directory must be new for the larger replication.
+- Missing array tasks block the decision summary.
+- Aggregation should use `--expected-report-dirs 18` for the default larger
+  primary-cell array.
+- Literature-derived metrics are diagnostic-only and cannot rescue a failed
+  primary cell.
+- Stage C0 results must not be used to change B.6 seeds, metrics, target pairs,
+  or normalization after seeing outcomes.

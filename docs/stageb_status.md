@@ -269,9 +269,42 @@ Option 3 remains premature.
 
 The literature-method rationale is recorded in
 `docs/alignment_metric_notes.md`. Stage B.6 currently implements k-sweep,
-calibrated CKA/RSA/ridge sanity checks, and PCA/raw/random representation
-diagnostics. It does not yet implement cycle-kNN, CKNNA, CCA/SVCCA/PWCCA, or
-local CKA retrieval.
+calibrated CKA/RSA/ridge sanity checks, PCA/raw/random representation
+diagnostics, and diagnostic-only literature metrics for cycle-kNN, CKNNA, CCA,
+and SVCCA. These new metrics are written to `b6_literature_metrics.csv` and are
+not mixed into the B.6 primary-cell summary. PWCCA and local CKA retrieval remain
+future diagnostics.
+
+The next B.6 run is the larger primary-cell CPU array:
+
+```text
+3 data seeds x 3 split seeds x PCA dims {16, 32}
+256 complete states
+heldout-to-heldout same-action-set setup
+diagnostic-only literature metrics
+```
+
+Stage C0 is now justified as a separate minimal prediction smoke, but full Stage
+C / PSP-like comparison remains premature.
+
+The larger primary-cell CPU array is recorded in
+`docs/stageb6_primary_cell_v1_cpu_experiment.md`. It completed 18/18 tasks with
+exit status 0. The fixed primary cell had:
+
+```text
+rgb-range adjusted mean: +0.0275
+rgb-range adjusted min:  +0.0112
+rgb-range positive:      9/9
+redundancy positive:     27/27
+AE > static CI:          9/9
+AE > shuffled CI:        8/9
+detect_geom Spearman:    +0.406
+```
+
+Literature metrics were written separately to `stageb6_literature_metrics.csv`.
+CKNNA gave the cleanest diagnostic support: action-effect was positive while
+static and shuffled graph controls were near null. Cycle-kNN was mostly
+positive; CCA/SVCCA remain diagnostic-only.
 
 ## Reproducible Smoke
 
