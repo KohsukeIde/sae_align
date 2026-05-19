@@ -10,6 +10,20 @@ from scripts.analyze_stageb6_diagnostics import (
     calibrated_cycle_knn,
     calibrated_svcca_mean,
 )
+from scripts.train_stagec0_prediction import binary_oracle_weights, percentile_rank
+
+
+def test_stagec0_percentile_rank_is_tie_aware():
+    ranks = percentile_rank(np.array([0.0, 1.0, 1.0, 2.0], dtype=np.float32))
+    assert np.allclose(ranks, np.array([0.0, 0.5, 0.5, 1.0], dtype=np.float32))
+
+
+def test_stagec0_binary_oracle_weights_keep_binary_ties():
+    weights = binary_oracle_weights(np.array([0, 1, 1, 0], dtype=np.float32), alpha=3.0)
+    assert np.allclose(weights[[0, 3]], weights[0])
+    assert np.allclose(weights[[1, 2]], weights[1])
+    assert weights[1] > weights[0]
+    assert np.isclose(float(np.mean(weights)), 1.0)
 
 
 def test_stageb_scripts_default_to_nonleakage_channels(tmp_path):

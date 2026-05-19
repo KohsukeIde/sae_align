@@ -12,7 +12,7 @@ The goal of this first phase is *not* to train a full world model or reproduce D
 4. Derived diagnostics such as edge maps are interpreted separately from redundancy controls.
 5. We can later use these strata for stratified action-effect alignment and selective prediction.
 
-The repository is designed to be extended incrementally. Stage 0 is implemented, and the NumPy Stage B action-effect kNN pipeline is available for pilot diagnostics. Stage B.6 is a partial robust positive: the metric is no longer obviously broken, but the effect size is still small and binary strata remain weak. Stage C0 v1 was a No-go: observability weighting did not beat uniform on event/OOD F1 in the hardened weighted-ridge smoke. Full Stage C / PSP-like comparison remains blocked.
+The repository is designed to be extended incrementally. Stage 0 is implemented, and the NumPy Stage B action-effect kNN pipeline is available for pilot diagnostics. Stage B.6 is a partial robust positive: the metric is no longer obviously broken, but the effect size is still small and binary strata remain weak. Stage C0/C0.5 were No-go: weighted-ridge and logistic detector smokes did not produce a strong oracle-positive behavioral detector. Full Stage C / PSP-like comparison remains blocked.
 
 ---
 
@@ -197,10 +197,10 @@ This adds same-action-type, same-action-id, action-residualized, and
 static-vs-action-effect reports. See `docs/stageb_status.md` for the current
 interpretation and remaining Stage B loopholes.
 
-The current priority is to redesign the Stage C0 behavioral smoke before any
-PSP/Dreamer work. B.6 remains weak positive alignment evidence, but the first
-hardened C0 weighted-ridge run did not convert that signal into event/OOD
-prediction gains. See `docs/stagec0_v1_cpu_experiment.md`.
+The current priority is no longer PSP/Dreamer. B.6 remains weak positive
+alignment evidence, but C0/C0.5 did not convert that signal into a strong
+behavioral validation. See `docs/stagec0_v1_cpu_experiment.md`,
+`docs/stagec05_precommit.md`, and `docs/stagec05_v1_cpu_experiment.md`.
 
 For a minimal Stage B.2 smoke run:
 

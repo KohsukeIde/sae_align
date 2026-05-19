@@ -93,8 +93,16 @@ def flatten2(x: np.ndarray) -> np.ndarray:
 def percentile_rank(x: np.ndarray) -> np.ndarray:
     x = np.asarray(x, dtype=np.float32)
     order = np.argsort(x, kind="mergesort")
-    ranks = np.empty_like(order, dtype=np.float32)
-    ranks[order] = np.arange(x.size, dtype=np.float32)
+    ranks = np.empty(x.size, dtype=np.float32)
+    sorted_x = x[order]
+    start = 0
+    while start < x.size:
+        end = start + 1
+        while end < x.size and sorted_x[end] == sorted_x[start]:
+            end += 1
+        avg_rank = 0.5 * float(start + end - 1)
+        ranks[order[start:end]] = avg_rank
+        start = end
     denom = max(1, x.size - 1)
     return ranks / float(denom)
 
@@ -376,6 +384,13 @@ def normalize_weights(score: np.ndarray, alpha: float) -> np.ndarray:
     return (w / (np.mean(w) + 1e-12)).astype(np.float32)
 
 
+def binary_oracle_weights(labels: np.ndarray, alpha: float) -> np.ndarray:
+    labels = np.asarray(labels, dtype=np.float32).reshape(-1)
+    w = np.ones(labels.size, dtype=np.float32)
+    w[labels > 0.5] = 1.0 + float(alpha)
+    return (w / (np.mean(w) + 1e-12)).astype(np.float32)
+
+
 def method_weights(
     method: str,
     *,
@@ -395,7 +410,7 @@ def method_weights(
     if method == "shuffled_observability":
         return normalize_weights(rng.permutation(observability_score), alpha)
     if method == "oracle_event":
-        return normalize_weights(event_present.astype(np.float32), alpha)
+        return binary_oracle_weights(event_present.astype(np.float32), alpha)
     raise ValueError(f"Unknown method: {method}")
 
 

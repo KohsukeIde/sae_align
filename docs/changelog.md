@@ -50,6 +50,11 @@
   fallback, and signed-delta F1 scoring. The first 3-data-seed C0 grid was
   No-go: observability weighting did not beat uniform on event/OOD F1, and
   oracle-event weighting also failed to beat uniform.
+- Added Stage C0.5 precommit and logistic detector smoke. C0.5 added
+  tie-aware ranks, explicit binary oracle weights, AUPRC/AUROC/balanced
+  accuracy, alpha sweeps, and changed-any diagnostics. The v1 detector was
+  No-go: oracle-event weighting failed the oracle-positive gate, observability
+  produced only a weak AUPRC lift below `+0.10`, and changed-any was saturated.
 
 ## v0.1.0
 

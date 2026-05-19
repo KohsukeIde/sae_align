@@ -34,6 +34,34 @@ Stage C1 PSP-like comparison: blocked.
 Next action: redesign C0 target/model/weighting before any PSP/Dreamer work.
 ```
 
+## Stage C0.5 v1 Result
+
+The oracle-positive detector redesign is recorded in
+`docs/stagec05_precommit.md` and `docs/stagec05_v1_cpu_experiment.md`.
+
+Summary:
+
+- C0.5 added a logistic classifier detector with AUPRC/AUROC/balanced accuracy,
+  alpha sweeps, tie-aware ranks, and explicit binary oracle weights.
+- Event-present detector: observability improved AUPRC weakly (`+0.0723` best)
+  but did not improve F1, did not reach the `+0.10` threshold, and was similar
+  to change-mask.
+- Oracle-event weighting failed the oracle-positive gate; event AUPRC deltas
+  were negative for oracle-event weighting.
+- Changed-any target was saturated; oracle/change/observability weights changed
+  AUPRC/F1 by about `0.001` or less.
+
+Decision:
+
+```text
+Stage C0.5 v1: No-go.
+Stage C1 PSP-like comparison: still blocked.
+C0.6 predictor-grounded redesign: not triggered under the precommit, because
+the oracle-event detector did not pass.
+ToyPowderWorld Stage C should stop unless a new preregistered target/model or
+environment migration phase is chosen.
+```
+
 ## What C0 changes
 
 Previous stages were inward-facing diagnostics: kNN alignment, action split reliability, PCA/tie sensitivity, and observability correlation. Stage C0 is outward-facing: it asks whether observability weighting improves prediction behavior.
