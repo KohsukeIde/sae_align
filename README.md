@@ -260,6 +260,8 @@ signal survives k-sweep, tie-jitter, PCA component sweep, all-action PCA
 diagnostics, and calibrated CKA/RSA/ridge sanity checks. This grid is larger
 than the B.5 pilot; use `scripts/submit_stageb_b6_v1_cpu_array.sh` for the
 CPU array version. GPU is not required.
+The literature-method mapping behind these diagnostics is recorded in
+`docs/alignment_metric_notes.md`.
 
 The Stage B.6 v1 CPU array is recorded in
 `docs/stageb6_v1_cpu_experiment.md`. It is a partial robust positive:

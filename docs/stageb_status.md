@@ -267,6 +267,12 @@ Continuous action-effect observability framing: strengthened.
 Option 3 remains premature.
 ```
 
+The literature-method rationale is recorded in
+`docs/alignment_metric_notes.md`. Stage B.6 currently implements k-sweep,
+calibrated CKA/RSA/ridge sanity checks, and PCA/raw/random representation
+diagnostics. It does not yet implement cycle-kNN, CKNNA, CCA/SVCCA/PWCCA, or
+local CKA retrieval.
+
 ## Reproducible Smoke
 
 Run:

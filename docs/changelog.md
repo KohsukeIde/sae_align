@@ -31,6 +31,10 @@
 - Added Stage B.6 preregistration, artifact diagnostics, calibrated
   CKA/RSA/ridge measurement sanity checks, k/jitter/PCA-dimension grid runners,
   and ABCI/qsub CPU-array helpers.
+- Added `docs/alignment_metric_notes.md`, recording the literature-method
+  review behind Stage B.6: mutual kNN and gallery-density critiques,
+  permutation-calibrated CKA/RSA/neighborhood metrics, and CCA/subspace
+  retrieval diagnostics.
 - Recorded Stage B.6 v1 CPU array: the preregistered primary cell reproduced a
   weak positive `rgb-range` signal and continuous observability association;
   label is partial robust positive, not full pass.

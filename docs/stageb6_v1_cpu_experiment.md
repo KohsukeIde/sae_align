@@ -113,6 +113,51 @@ same qualitative reading:
 - shuffled controls can still be high for some global metrics, so calibrated
   CKA/RSA are diagnostics rather than final claims.
 
+The literature-method notes behind these choices are in
+`docs/alignment_metric_notes.md`. They explicitly record that the three checked
+papers use different alignment primitives: raw mutual kNN and gallery-density
+stress tests, permutation-calibrated metric families including mKNN/cycle-kNN/
+CKNNA/CKA/RSA, and CCA/subspace-plus-retrieval alignment for 3D-text features.
+Stage B.6 covers only the subset already implemented in this repo; cycle-kNN,
+CKNNA, and CCA remain future diagnostics.
+
+For the primary replication cell
+`pca_probe_only / probe_action_type_apply / d=32`, `rgb-range` measurement
+sanity over the four data/split runs was:
+
+| control | measurement | calibrated mean | calibrated min | p<=0.05 runs | interpretation |
+| --- | --- | ---: | ---: | ---: | --- |
+| action-effect | action-conditioned RSA | `+0.293` | `+0.231` | `4/4` | stable positive |
+| action-effect | state-flat RSA | `+0.169` | `+0.136` | `4/4` | stable positive |
+| action-effect | state-flat linear CKA | `+0.049` | `+0.016` | `2/4` | positive but weaker |
+| action-effect | ridge R2 | `+4.162` | `-592.555` | `0/4` | numerically unstable |
+| static | state-flat RSA | `+0.025` | `+0.009` | `2/4` | weak calibrated static structure |
+| shuffled action columns | state-flat RSA | `+0.043` | `+0.001` | `2/4` | shuffled controls can retain global structure |
+
+Thus the measurement sanity checks support a weak positive action-effect
+direction, but ridge transfer and global metrics are not clean enough to replace
+the kNN result.
+
+## Review Method
+
+A read-only literature-method audit was run before this doc update. The audit
+was intentionally fixed-scope: inspect the three specified papers and current
+repo code/docs, then report method differences and loopholes. It was not used
+as an open-ended search engine.
+
+The audit confirmed that the papers use different primitives:
+
+- `2604.18572`: L2-normalized mutual kNN overlap over shared galleries, with
+  stress tests for gallery size, `k`, and many-to-many correspondences.
+- `2602.14486`: calibrated metric suite including mKNN, cycle-kNN, CKNNA,
+  CKA/RSA/CCA-family metrics, with permutation-null correction.
+- `2503.05283`: CCA-selected low-dimensional subspaces followed by affine or
+  local CKA matching/retrieval.
+
+B.6 implements the first two only partially and treats the third as motivation
+for subspace diagnostics. The missing methods are recorded in
+`docs/alignment_metric_notes.md`.
+
 ## Interpretation
 
 Stage B.6 v1 is best labeled:

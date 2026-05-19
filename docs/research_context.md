@@ -8,6 +8,12 @@ This repository supports early-stage experiments for a project on stratified act
 - PRH/Revisiting PRH/CAVE Umwelten motivate moving beyond global static representation alignment.
 - Policy-Shaped Prediction, Denoised MDPs, and task-relevant reconstruction motivate strong baselines for selective prediction and distractor-robust world modeling.
 
+For the Stage B metric choices, read `docs/alignment_metric_notes.md`. It
+records the method-level takeaways from `Back into Plato's Cave`, `Revisiting
+the Platonic Representation Hypothesis`, and `Escaping Plato's Cave`, including
+the different uses of mutual kNN, calibrated CKA/RSA/neighborhood metrics, and
+CCA/subspace-based retrieval.
+
 ## Key design choice
 
 The first experiments are intentionally simulator-only because the physical-null stratum requires access to an oracle world state. This is treated as a feature of the controlled diagnostic setting, not as a claim that physical null is directly observable in real-world datasets.

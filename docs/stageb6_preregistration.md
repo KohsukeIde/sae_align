@@ -118,3 +118,19 @@ be fragile at scale and in many-to-many settings, raw similarity metrics need
 permutation-null calibration, and useful alignment may live in a low-dimensional
 subspace. Therefore, B.6 includes both local-neighborhood kNN diagnostics and
 calibrated CKA/RSA/linear-transfer sanity checks.
+
+The specific literature-method mapping is recorded in
+`docs/alignment_metric_notes.md`. In short:
+
+- `Back into Plato's Cave` motivates k-sweep and caution around raw mutual kNN;
+- `Revisiting the Platonic Representation Hypothesis` motivates calibrated
+  CKA/RSA/ridge sanity checks and separates neighbor-identity alignment from
+  metric-distance alignment;
+- `Escaping Plato's Cave` motivates subspace diagnostics while keeping
+  transductive subspace fits out of the primary gate.
+
+| Paper | Metric lesson | B.6 implementation | Not implemented |
+| --- | --- | --- | --- |
+| `2604.18572` | raw mutual kNN depends on gallery density, `k`, and one-to-one assumptions | heldout-to-heldout kNN, k-sweep, chance adjustment | dense-gallery scaling |
+| `2602.14486` | raw metrics need permutation-null calibration; mKNN, cycle-kNN, CKNNA, CKA/RSA answer different questions | calibrated CKA/RSA/ridge sanity checks, kNN overlap | cycle-kNN, CKNNA, full PRH metric suite |
+| `2503.05283` | useful alignment can live in a correlated low-dimensional subspace | probe-only PCA, all-action PCA diagnostic, raw/random controls | CCA/SVCCA/PWCCA, local CKA retrieval |
