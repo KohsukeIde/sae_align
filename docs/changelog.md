@@ -28,6 +28,9 @@
   `pca_probe_only / probe_action_type_apply` showed a partial positive
   `rgb-range` signal, but the result is representation/normalization dependent;
   Stage C remains blocked.
+- Added Stage B.6 preregistration, artifact diagnostics, calibrated
+  CKA/RSA/ridge measurement sanity checks, k/jitter/PCA-dimension grid runners,
+  and ABCI/qsub CPU-array helpers.
 
 ## v0.1.0
 

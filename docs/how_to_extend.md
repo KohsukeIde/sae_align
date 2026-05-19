@@ -107,11 +107,18 @@ B.5 v1 is partial positive under `pca_probe_only / probe_action_type_apply`,
 but the signal is representation/normalization dependent. The next hardening
 steps are tie-jitter sensitivity, all-action PCA upper bound, and k-sensitivity.
 
+Stage B.6 is the active hardening step. Read
+`docs/stageb6_preregistration.md`. It tests whether the B.5 signal survives
+k-sweep, tie-jitter, PCA component sweep, all-action PCA diagnostics, and
+calibrated CKA/RSA/ridge measurement-primitive sanity checks. Treat all-action
+PCA as transductive diagnostic only. Do not choose the best B.6 cell after
+seeing the grid.
+
 ## Add Stage C: selective prediction
 
-Stage C is still too early. Add selective-prediction baselines only after Stage
-B.4 same-channel reliability and redundancy calibration pass, and after Stage
-B.3-style target alignment has a calibrated metric.
+Stage C is still too early. Add selective-prediction baselines only after B.6
+shows that the held-out same-action-set `rgb-range` signal is stable across
+k, jitter, PCA dimension, and measurement-primitive diagnostics.
 
 Create:
 

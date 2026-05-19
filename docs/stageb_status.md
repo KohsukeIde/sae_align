@@ -206,6 +206,40 @@ about `+0.0447` versus the B.2 reference `+0.0400`. The blocker is that this
 signal is representation/normalization dependent and `pca_probe_only` remains
 tie-heavy.
 
+## Stage B.6 Artifact And Measurement-Primitive Diagnostics
+
+Stage B.6 is preregistered in `docs/stageb6_preregistration.md`. It keeps the
+B.5 held-out same-action-set setup but tests whether the weak `rgb-range`
+signal is robust to:
+
+```text
+k-sweep
+tie-jitter
+PCA component sweep
+pca_probe_only vs pca_all_action diagnostic
+raw_delta / random_projection diagnostics
+calibrated CKA / RSA / ridge transfer sanity checks
+```
+
+The primary replication cell is fixed before running:
+
+```text
+pca_probe_only / probe_action_type_apply / d=32 / k=10 / jitter=0
+```
+
+This cell can reproduce B.5, but it cannot by itself justify Stage C. B.6
+should be interpreted by sign stability and paired CI across the robustness
+families. `pca_all_action` is transductive and diagnostic-only.
+
+Current decision before B.6 v1:
+
+```text
+Stage C remains blocked.
+Binary strata framing remains weak.
+Continuous observability is the current working framing, pending B.6.
+Option 3 remains premature.
+```
+
 ## Reproducible Smoke
 
 Run:

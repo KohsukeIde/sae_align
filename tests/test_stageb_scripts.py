@@ -531,3 +531,65 @@ def test_state_signature_knn_script_writes_stageb2_reports(tmp_path):
     assert (b5_out / "reports" / "gate_summary.csv").exists()
     b5_summary = json.loads((b5_out / "reports" / "stageb5_summary.json").read_text())
     assert b5_summary["gate_order"][0] == "gate0_heldout_same_action_redundancy"
+
+    b6_out = tmp_path / "stageb6"
+    subprocess.run(
+        [
+            sys.executable,
+            "scripts/analyze_stageb6_diagnostics.py",
+            "--data",
+            str(data_path),
+            "--model",
+            str(action_model_dir / "transition_encoders.npz"),
+            "--static-model",
+            str(static_model_dir / "transition_encoders.npz"),
+            "--out",
+            str(b6_out),
+            "--channels",
+            "rgb",
+            "range",
+            "local",
+            "--probe-action-ids",
+            "0",
+            "1",
+            "2",
+            "--representations",
+            "pca_probe_only",
+            "raw_delta",
+            "random_projection",
+            "--k-values",
+            "1",
+            "2",
+            "--jitter-epsilons",
+            "0",
+            "1e-6",
+            "--jitter-seeds",
+            "0",
+            "--max-states",
+            "5",
+            "--normalization-modes",
+            "none",
+            "probe_action_type_apply",
+            "--permutation-repeats",
+            "2",
+            "--ridge-splits",
+            "2",
+        ],
+        check=True,
+        env=env,
+    )
+    assert (b6_out / "reports" / "b6_knn_sensitivity.csv").exists()
+    assert (b6_out / "reports" / "b6_paired_differences.csv").exists()
+    assert (b6_out / "reports" / "b6_observability_score_correlation_by_k_jitter.csv").exists()
+    assert (b6_out / "reports" / "b6_feature_tie_by_k_jitter.csv").exists()
+    assert (b6_out / "reports" / "b6_measurement_sanity.csv").exists()
+    assert (b6_out / "reports" / "b6_decision_summary.csv").exists()
+    b6_summary = json.loads((b6_out / "reports" / "stageb6_summary.json").read_text())
+    assert b6_summary["k_values"] == [1, 2]
+    with open(b6_out / "reports" / "b6_measurement_sanity.csv") as f:
+        b6_rows = f.read()
+    assert "state_flat_linear_cka" in b6_rows
+    assert "state_flat_rsa_spearman" in b6_rows
+    assert "state_flat_ridge_r2" in b6_rows
+    assert "action_conditioned_rsa_spearman_mean" in b6_rows
+    assert "calibrated_score" in b6_rows

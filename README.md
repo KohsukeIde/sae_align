@@ -248,3 +248,15 @@ Read `docs/stageb5_preregistration.md` and
 pass: `pca_probe_only / probe_action_type_apply` recovers a weak `rgb-range`
 signal, but raw/random diagnostics are weaker and the PCA result is tie-heavy.
 Stage C remains blocked.
+
+For the Stage B.6 artifact and measurement-primitive diagnostics:
+
+```bash
+PYTHONPATH=src bash scripts/run_stageb_b6_v1_cpu.sh outputs/stageb_b6_v1_cpu
+```
+
+Read `docs/stageb6_preregistration.md` first. B.6 checks whether the B.5
+signal survives k-sweep, tie-jitter, PCA component sweep, all-action PCA
+diagnostics, and calibrated CKA/RSA/ridge sanity checks. This grid is larger
+than the B.5 pilot; use `scripts/submit_stageb_b6_v1_cpu_array.sh` for the
+CPU array version. GPU is not required.
