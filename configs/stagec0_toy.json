@@ -1,0 +1,22 @@
+{
+  "stage": "C0",
+  "description": "Minimal selective-prediction smoke test for continuous action-effect observability weighting.",
+  "input_channels": ["rgb"],
+  "target_channel": "rgb",
+  "event_channel": "event_response",
+  "observability_channels": ["rgb", "range"],
+  "observability_mix": "geom",
+  "methods": [
+    "uniform",
+    "change_mask",
+    "observability",
+    "shuffled_observability",
+    "oracle_event"
+  ],
+  "stageb_reference_signal": 0.05,
+  "recommended_seeds": [0, 1, 2],
+  "channel_dim": 128,
+  "ridge": 1.0,
+  "weight_alpha": 4.0,
+  "ood_noise_std": 0.35
+}

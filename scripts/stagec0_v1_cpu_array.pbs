@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+#PBS -q rt_HC
+#PBS -l select=1
+#PBS -l walltime=08:00:00
+#PBS -P gag51404
+#PBS -j oe
+
+set -euo pipefail
+
+cd "${PBS_O_WORKDIR:-/groups/gag51404/ide/vgi/sae_align_repo}"
+
+if [[ -n "${STAGEC0_ENV_PREFIX:-}" ]]; then
+  # shellcheck source=/dev/null
+  source "${STAGEC0_ENV_PREFIX}/bin/activate"
+fi
+
+export PYTHONPATH="${PYTHONPATH:-src}"
+export OMP_NUM_THREADS="${OMP_NUM_THREADS_VALUE:-8}"
+export OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS_VALUE:-8}"
+export MKL_NUM_THREADS="${MKL_NUM_THREADS_VALUE:-8}"
+
+bash scripts/run_stagec0_v1_cpu_task.sh

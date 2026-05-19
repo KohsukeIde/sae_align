@@ -45,6 +45,11 @@
 - Recorded the B.6 primary-cell larger CPU experiment: 18/18 tasks completed,
   fixed `d=32/k=10/jitter=0` primary cell stayed positive in 9/9 runs, and
   CKNNA provided the cleanest diagnostic support among literature metrics.
+- Added and ran Stage C0 v1. The implementation was hardened against
+  train/test ranking leakage, diagnostic-channel input leakage, silent event
+  fallback, and signed-delta F1 scoring. The first 3-data-seed C0 grid was
+  No-go: observability weighting did not beat uniform on event/OOD F1, and
+  oracle-event weighting also failed to beat uniform.
 
 ## v0.1.0
 
