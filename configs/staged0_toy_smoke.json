@@ -1,0 +1,15 @@
+{
+  "backend": "toy",
+  "n_states": 24,
+  "k_actions": 8,
+  "grid_size": 32,
+  "horizon": 3,
+  "seed": 0,
+  "device": "cpu",
+  "use_jit": false,
+  "channels": ["rgb", "range", "local"],
+  "dense_sampling": "full-states",
+  "max_delta_samples": 192,
+  "min_event_prevalence": 0.02,
+  "max_event_prevalence": 0.98
+}

@@ -63,6 +63,17 @@
   result was No-go: predictor-grounded observability produced a raw AUPRC lift
   (`+0.0898`) but oracle-event failed the hard gate (`+0.0015` behavior delta),
   so ToyPowderWorld Stage C is stopped.
+- Added Stage D0 real-Powderworld oracle-positive detector audit files:
+  optional real adapter, D0 dataset generator, toy smoke, sanity comparison,
+  qsub CPU-array submission, and D0 precommit/status docs. D0 remains an
+  oracle-positive feasibility audit only; it is not PSP/Dreamer/RL.
+- Hardened the D0 generator and summary logic after review: event targets now
+  exclude broad `any_change`, Toy backend subtracts no-op physics events,
+  action-array width is inferred dynamically, do/no-op stochastic rollouts use
+  paired seeds, generator sanity stats are emitted, event prevalence is gated,
+  and D0 summaries use D0-specific branch labels with observability-or-PG pass
+  logic.
+- Ran Stage D0 v1 real-Powderworld CPU array over three generator seeds. Generator sanity passed, but the oracle-positive detector audit failed: `oracle_event` best AUPRC delta was `-0.0032`, best F1 delta was `+0.0068`, and the decision was Branch 3 / No-go. Stage C1 / PSP-like comparison remains blocked.
 
 ## v0.1.0
 

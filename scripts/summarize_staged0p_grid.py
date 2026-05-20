@@ -75,6 +75,7 @@ def main() -> None:
     p.add_argument("--root", type=Path, required=True)
     p.add_argument("--out", type=Path, default=None)
     p.add_argument("--expected-report-dirs", type=int, default=None)
+    p.add_argument("--phase", choices=["d0p", "d0"], default="d0p")
     args = p.parse_args()
 
     out = args.out or args.root
@@ -146,8 +147,12 @@ def main() -> None:
         "n_rows": len(rows),
         "oracle_event_best_auprc_delta": best("oracle_event"),
         "oracle_event_best_f1_delta": best("oracle_event", "test_f1_delta_mean"),
+        "oracle_event_best_auprc_row": best_row("oracle_event", "test_auprc_delta_mean"),
+        "oracle_event_best_f1_row": best_row("oracle_event", "test_f1_delta_mean"),
         "observability_best_auprc_delta": best("observability"),
         "observability_best_f1_delta": best("observability", "test_f1_delta_mean"),
+        "observability_best_auprc_row": best_row("observability", "test_auprc_delta_mean"),
+        "observability_best_f1_row": best_row("observability", "test_f1_delta_mean"),
         "predictor_grounded_best_auprc_delta": best("predictor_grounded"),
         "predictor_grounded_best_f1_delta": best("predictor_grounded", "test_f1_delta_mean"),
         "predictor_uncertainty_best_auprc_delta": best("predictor_uncertainty"),
@@ -172,8 +177,16 @@ def main() -> None:
         "predictor_grounded_best_behavior_row": best_row("predictor_grounded"),
         "stageb_reference_signal": 0.05,
     }
-    oracle_auprc_pass = bool(decision["oracle_event_best_auprc_delta"] >= 0.10)
-    oracle_f1_pass = bool(decision["oracle_event_best_f1_delta"] >= 0.10)
+    oracle_auprc_best = decision["oracle_event_best_auprc_row"]
+    oracle_f1_best = decision["oracle_event_best_f1_row"]
+    oracle_auprc_pass = bool(
+        decision["oracle_event_best_auprc_delta"] >= 0.10
+        and float(oracle_auprc_best.get("test_auprc_delta_positive_frac", 0.0)) >= 0.80
+    )
+    oracle_f1_pass = bool(
+        decision["oracle_event_best_f1_delta"] >= 0.10
+        and float(oracle_f1_best.get("test_f1_delta_positive_frac", 0.0)) >= 0.80
+    )
     oracle_pass = bool(oracle_auprc_pass or oracle_f1_pass)
     best_control = finite_max(
         [
@@ -212,25 +225,58 @@ def main() -> None:
         and float(pg_f1_best.get("test_f1_delta_positive_frac", 0.0)) >= 0.80
     )
     pg_pass_raw = bool(pg_auprc_pass_raw or pg_f1_pass_raw)
-    pg_pass = bool(oracle_pass and pg_pass_raw)
-    if oracle_pass and pg_pass:
-        branch = "branch_1_best_case_proceed_to_c1"
-    elif oracle_pass and not pg_pass:
-        branch = "branch_2_stop_toy_or_environment_migration"
+    obs_auprc_best = decision["observability_best_auprc_row"]
+    obs_f1_best = decision["observability_best_f1_row"]
+    obs_control_auprc = finite_max(
+        [
+            decision["change_mask_best_auprc_delta"],
+            decision["shuffled_observability_best_auprc_delta"],
+        ]
+    )
+    obs_control_f1 = finite_max(
+        [
+            decision["change_mask_best_f1_delta"],
+            decision["shuffled_observability_best_f1_delta"],
+        ]
+    )
+    obs_auprc_pass_raw = bool(
+        decision["observability_best_auprc_delta"] >= 0.10
+        and decision["observability_best_auprc_delta"] > obs_control_auprc
+        and float(obs_auprc_best.get("test_auprc_delta_positive_frac", 0.0)) >= 0.80
+    )
+    obs_f1_pass_raw = bool(
+        decision["observability_best_f1_delta"] >= 0.10
+        and decision["observability_best_f1_delta"] > obs_control_f1
+        and float(obs_f1_best.get("test_f1_delta_positive_frac", 0.0)) >= 0.80
+    )
+    obs_pass_raw = bool(obs_auprc_pass_raw or obs_f1_pass_raw)
+    proposed_pass_raw = bool(pg_pass_raw or (args.phase == "d0" and obs_pass_raw))
+    proposed_pass = bool(oracle_pass and proposed_pass_raw)
+    if oracle_pass and proposed_pass:
+        branch = "branch_1_best_case_proceed_to_c1" if args.phase == "d0p" else "branch_1_oracle_and_observability_pass_proceed_to_c1"
+    elif oracle_pass and not proposed_pass:
+        branch = "branch_2_stop_toy_or_environment_migration" if args.phase == "d0p" else "branch_2_oracle_pass_observability_fail_stop_environment"
     else:
-        branch = "branch_3_detector_failed_stop_toy"
+        branch = "branch_3_detector_failed_stop_toy" if args.phase == "d0p" else "branch_3_oracle_failed_stop_environment"
     decision.update(
         {
+            "phase": args.phase,
             "oracle_pass_plus_0p10": oracle_pass,
             "oracle_auprc_pass_plus_0p10": oracle_auprc_pass,
             "oracle_f1_pass_plus_0p10": oracle_f1_pass,
+            "observability_raw_auprc_pass_plus_0p10_and_controls": obs_auprc_pass_raw,
+            "observability_raw_f1_pass_plus_0p10_and_controls": obs_f1_pass_raw,
+            "observability_raw_pass_plus_0p10_and_controls": obs_pass_raw,
             "predictor_grounded_raw_auprc_pass_plus_0p10_and_controls": pg_auprc_pass_raw,
             "predictor_grounded_raw_f1_pass_plus_0p10_and_controls": pg_f1_pass_raw,
             "predictor_grounded_raw_pass_plus_0p10_and_controls": pg_pass_raw,
-            "predictor_grounded_pass_plus_0p10_and_controls": pg_pass,
+            "predictor_grounded_pass_plus_0p10_and_controls": bool(oracle_pass and pg_pass_raw),
+            "proposed_pass_plus_0p10_and_controls": proposed_pass,
             "best_control_behavior_delta": best_control,
             "best_control_auprc_delta": best_control_auprc,
             "best_control_f1_delta": best_control_f1,
+            "observability_auprc_control_margin": decision["observability_best_auprc_delta"] - obs_control_auprc,
+            "observability_f1_control_margin": decision["observability_best_f1_delta"] - obs_control_f1,
             "predictor_grounded_control_margin": decision["predictor_grounded_best_behavior_delta"] - best_control,
             "predictor_grounded_auprc_control_margin": decision["predictor_grounded_best_auprc_delta"] - best_control_auprc,
             "predictor_grounded_f1_control_margin": decision["predictor_grounded_best_f1_delta"] - best_control_f1,

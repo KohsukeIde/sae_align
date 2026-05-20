@@ -115,6 +115,15 @@ PYTHONPATH=src python scripts/summarize_stagec0_grid.py --root outputs/stagec0_v
 
 ## Decision rule
 
-If observability weighting gives a clear event/OOD improvement with effect size larger than the Stage-B reference signal (~0.05), proceed to Stage C1 PSP-like comparisons.
+This section is now superseded by the completed C0.5, D0', and D0 audits.
 
-If not, stop strategy discussion and revise the representation/environment instead of forcing a paper.
+Current final rule:
+
+- Stage C1 / PSP-like comparison is blocked.
+- ToyPowderWorld Stage C is stopped.
+- Stage D0 real-Powderworld audit was also No-go.
+- Do not continue with C0.7/C0.8/D1/D2 detector-tweak loops for the same
+  theme.
+- Any further work must be a separately preregistered target/model or project
+  redesign, or a reframing around diagnostic alignment evidence rather than
+  behavioral utility.

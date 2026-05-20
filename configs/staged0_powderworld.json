@@ -1,0 +1,15 @@
+{
+  "backend": "powderworld",
+  "n_states": 128,
+  "k_actions": 32,
+  "grid_size": 64,
+  "horizon": 4,
+  "seed": 0,
+  "device": "cpu",
+  "use_jit": false,
+  "channels": ["rgb", "range", "local"],
+  "dense_sampling": "full-states",
+  "max_delta_samples": 4096,
+  "min_event_prevalence": 0.02,
+  "max_event_prevalence": 0.98
+}

@@ -1,0 +1,2 @@
+# One Stage-D0 dataset path per line for qsub arrays.
+# outputs/staged0_v1_cpu/data/staged0_dataset.npz
