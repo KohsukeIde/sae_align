@@ -1,0 +1,4 @@
+# One Stage-0 dataset path per line. Copy to configs/staged0p_datasets.txt.
+outputs/stageb_b6_primary_cell_v1_cpu/seed_0/split_17/pca_32/stage0/stage0_dataset.npz
+outputs/stageb_b6_primary_cell_v1_cpu/seed_1/split_17/pca_32/stage0/stage0_dataset.npz
+outputs/stageb_b6_primary_cell_v1_cpu/seed_2/split_17/pca_32/stage0/stage0_dataset.npz

@@ -55,6 +55,14 @@
   accuracy, alpha sweeps, and changed-any diagnostics. The v1 detector was
   No-go: oracle-event weighting failed the oracle-positive gate, observability
   produced only a weak AUPRC lift below `+0.10`, and changed-any was saturated.
+- Added Stage D0' as the final one-shot ToyPowderWorld follow-up before
+  environment migration or project redesign. D0' tests exactly one
+  predictor-grounded observability score, treats oracle-event as a hard gate,
+  and blocks C0.7/C0.8 detector-tweak loops.
+- Ran Stage D0' v1 locally on the three default B.6 primary-cell datasets. The
+  result was No-go: predictor-grounded observability produced a raw AUPRC lift
+  (`+0.0898`) but oracle-event failed the hard gate (`+0.0015` behavior delta),
+  so ToyPowderWorld Stage C is stopped.
 
 ## v0.1.0
 

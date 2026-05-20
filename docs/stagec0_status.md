@@ -62,6 +62,14 @@ ToyPowderWorld Stage C should stop unless a new preregistered target/model or
 environment migration phase is chosen.
 ```
 
+Stage D0' was the one explicit exception opened after this stop decision. It is
+recorded in `docs/staged0p_v1_cpu_experiment.md`.
+
+Stage D0' v1 was also No-go: `oracle_event` failed the hard oracle-positive
+gate, while `predictor_grounded` produced only a diagnostic raw AUPRC lift.
+ToyPowderWorld Stage C is now stopped. Do not add C0.7/C0.8 detector-tweak
+loops.
+
 ## What C0 changes
 
 Previous stages were inward-facing diagnostics: kNN alignment, action split reliability, PCA/tie sensitivity, and observability correlation. Stage C0 is outward-facing: it asks whether observability weighting improves prediction behavior.
