@@ -74,6 +74,19 @@
   and D0 summaries use D0-specific branch labels with observability-or-PG pass
   logic.
 - Ran Stage D0 v1 real-Powderworld CPU array over three generator seeds. Generator sanity passed, but the oracle-positive detector audit failed: `oracle_event` best AUPRC delta was `-0.0032`, best F1 delta was `+0.0068`, and the decision was Branch 3 / No-go. Stage C1 / PSP-like comparison remains blocked.
+- Added the Action-IV pivot phase: repo-internal pivot memo, Action-IV
+  precommit, official-task oracle sanity scripts, effect-subspace prototype,
+  qsub helper, and Action-IV metrics.
+- Hardened Action-IV after review: the real Powderworld backend now targets the
+  installed `powderworld.envs`/`PWSim` API, action banks are fixed across
+  states, DestroyAll audits include a predeclared erase-action fraction,
+  degenerate targets are marked invalid, oracle alpha selection uses validation
+  AUPRC only, and Step 3 is skipped unless Step 2 passes.
+- Ran Action-IV Step-2 real-Powderworld DestroyAll v1b over three seeds. The
+  target was non-degenerate, but the oracle-positive gate failed:
+  validation-selected oracle AUPRC delta mean was `+0.00168` with min
+  `-0.00052`. Action-IV Step 3 / neural prototype remains blocked for this
+  task/model.
 
 ## v0.1.0
 

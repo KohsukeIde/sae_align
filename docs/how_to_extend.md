@@ -1,5 +1,11 @@
 # How to Extend This Repo
 
+Current-status note: this file records the extension plan through Stage B.6 and
+the originally proposed Stage C0 path.  The completed Stage C0/C0.5/D0'/D0
+audits supersede that path: scalar observability weighting is stopped, full Stage
+C / PSP-like comparison remains blocked, and new work should use a separately
+preregistered phase such as Action-IV.
+
 ## Add Stage A.5: deployable proxy agreement
 
 Create:

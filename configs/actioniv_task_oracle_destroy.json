@@ -1,0 +1,12 @@
+{
+  "backend": "powderworld",
+  "task_gen": "PWTaskGenDestroyAll",
+  "n_states": 256,
+  "actions_per_state": 16,
+  "batch_size": 32,
+  "device": "cpu",
+  "use_jit": false,
+  "time_per_action": 2,
+  "seed": 0,
+  "notes": "Official Powderworld DestroyAll task sanity audit. Requires powderworld installation."
+}

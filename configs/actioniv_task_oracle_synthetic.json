@@ -1,0 +1,10 @@
+{
+  "backend": "synthetic",
+  "n_states": 256,
+  "actions_per_state": 16,
+  "grid_size": 32,
+  "horizon": 3,
+  "seed": 0,
+  "channels": ["rgb", "range", "local"],
+  "notes": "Synthetic Action-IV smoke dataset. Does not require Powderworld."
+}

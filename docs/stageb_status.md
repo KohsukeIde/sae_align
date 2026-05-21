@@ -1,5 +1,10 @@
 # Stage B Status
 
+Current-status note: Stage B.6 remains the surviving weak/partial diagnostic
+positive, but the later Stage C0/C0.5/D0'/D0 behavioral audits were No-go.  Read
+the Stage C/D status docs and Action-IV precommit before treating the historical
+Stage C0 recommendations below as active next steps.
+
 This repo should treat Stage 0 as the channel-adequacy gate and Stage B as a
 controlled alignment pilot. Stage C / PSP-like selective prediction is still too
 early. Stage B.2 state-level action-effect signature alignment is implemented as
