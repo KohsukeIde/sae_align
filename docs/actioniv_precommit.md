@@ -46,6 +46,12 @@ If this fails, do not interpret observability or Action-IV utility on this task/
 
 Important: if `oracle_task` wins but `observability` loses, this does not revive scalar observability weighting.  It only means the task target is learnable.
 
+Post-v1 loophole review: `docs/actioniv_d0_gate_postmortem.md` records why
+oracle sample/class weighting may be the wrong proxy for task learnability. That
+review does not retroactively pass v1. A learnability-based Step 2 requires a
+separate Step-2-v2 precommit and a fresh or explicitly held-out rerun before Step
+3 can be interpreted.
+
 ## Step 3: Action-IV minimal prototype
 
 Fit/evaluate a small effect representation with paired cross-channel action effects:

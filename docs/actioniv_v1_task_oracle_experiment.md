@@ -108,3 +108,49 @@ Under the precommit:
 - Do not proceed to neural Action-IV or PSP/Dreamer comparisons from this run.
 
 This does not disprove the broad action-effect representation idea, but this operationalization does not pass the official-task oracle sanity gate.
+
+## Gate Postmortem
+
+After the No-go decision, a one-shot postmortem audited whether the gate itself
+was a valid learnability test:
+
+```bash
+PYTHONPATH=src:. bash scripts/run_actioniv_gate_postmortem_v1b.sh \
+  outputs/actioniv_gate_postmortem_v1b \
+  outputs/actioniv_task_oracle_v1b_cpu_array
+```
+
+This reused the existing v1b datasets and did not rerun Powderworld simulation.
+
+Decision:
+
+```text
+branch: case_a_task_learnable_weighting_gate_inappropriate
+oracle_as_feature_mean_auprc: 1.0000
+oracle_as_feature_min_auprc: 1.0000
+uniform_mean_test_auprc: 0.9064
+uniform_mean_test_prevalence: 0.2281
+uniform_mean_auprc_lift_over_prevalence: +0.6783
+```
+
+Feature-set summary:
+
+| feature set | mean test AUPRC | mean AUPRC - prevalence |
+|---|---:|---:|
+| action only | `0.8472` | `+0.6191` |
+| obs RGB only | `0.2812` | `+0.0532` |
+| obs range only | `0.2281` | `0.0000` |
+| obs RGB + action | `0.9064` | `+0.6783` |
+| obs RGB + range + action | `0.9108` | `+0.6827` |
+
+This changes the interpretation of the No-go:
+
+- The v1 Step-2 gate still failed under its own precommit.
+- The target is learnable, and oracle-as-feature sanity passes.
+- The failed `oracle_task` result shows that target-label sample weighting is a
+  poor AUPRC upper-bound gate, not that DestroyAll is unlearnable.
+- Action-only is already strong, so any future Action-IV task-head claim must
+  beat an action-only shortcut baseline.
+
+Step 3 remains blocked until a new Step-2-v2 precommit is written and passed on
+a fresh or explicitly held-out rerun.

@@ -20,8 +20,10 @@ configs/actioniv_task_oracle_destroy.json   # real Powderworld example config
 scripts/make_actioniv_task_dataset.py       # synthetic or official Powderworld task dataset generator
 scripts/train_actioniv_task_oracle.py       # Step 2 oracle-positive task detector audit
 scripts/train_actioniv_effect_encoder.py    # Step 3 minimal Action-IV effect representation prototype
+scripts/postmortem_actioniv_gate.py         # one-shot postmortem for the failed oracle-weighting gate
 scripts/run_actioniv_smoke.sh               # synthetic end-to-end smoke
 scripts/run_actioniv_powderworld_destroy.sh # real Powderworld example runner
+scripts/run_actioniv_gate_postmortem_v1b.sh # postmortem runner over existing v1b artifacts
 scripts/submit_actioniv_task_oracle_array.sh# site-local qsub template
 src/sae_align/action_iv/metrics.py          # small reusable NumPy metrics/helpers
 ```
@@ -91,3 +93,28 @@ oracle_min_auprc_delta: -0.00052
 
 Under the precommit, Step 3 / Action-IV effect encoder is not interpreted for
 this task/model, and PSP/Dreamer/neural Action-IV follow-up remains blocked.
+
+## v1 postmortem
+
+A one-shot gate postmortem was then run on the existing v1b datasets:
+
+```bash
+PYTHONPATH=src:. bash scripts/run_actioniv_gate_postmortem_v1b.sh \
+  outputs/actioniv_gate_postmortem_v1b \
+  outputs/actioniv_task_oracle_v1b_cpu_array
+```
+
+It did not rerun Powderworld simulation.  The result was:
+
+```text
+branch: case_a_task_learnable_weighting_gate_inappropriate
+oracle_as_feature_mean_auprc: 1.0000
+uniform_obs_action_auprc: 0.9064
+test_prevalence: 0.2281
+action_only_auprc: 0.8472
+```
+
+This does not retroactively pass Step 2.  It shows that the failed v1 gate was
+testing privileged sample/class weighting, not task learnability.  A future
+Step-2-v2 requires a fresh precommit and must include action-only shortcut
+controls before Step 3 can be interpreted.

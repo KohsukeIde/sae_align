@@ -87,6 +87,14 @@
   validation-selected oracle AUPRC delta mean was `+0.00168` with min
   `-0.00052`. Action-IV Step 3 / neural prototype remains blocked for this
   task/model.
+- Added and ran the Action-IV D0 gate postmortem on the existing v1b datasets.
+  The audit found `case_a_task_learnable_weighting_gate_inappropriate`:
+  oracle-as-feature sanity reached AUPRC `1.0`, uniform obs+action AUPRC was
+  `0.9064` versus prevalence `0.2281`, but oracle sample weighting remained
+  near-null. The old Step-2 gate remains failed, but the failure should be read
+  as a bad oracle-weighting gate rather than an unlearnable DestroyAll target.
+  Action-only AUPRC was also high (`0.8472`), so any Step-2-v2 / Step-3 task
+  claim must include shortcut controls.
 
 ## v0.1.0
 
