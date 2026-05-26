@@ -95,6 +95,10 @@
   as a bad oracle-weighting gate rather than an unlearnable DestroyAll target.
   Action-only AUPRC was also high (`0.8472`), so any Step-2-v2 / Step-3 task
   claim must include shortcut controls.
+- Added `docs/experiment_pause_for_survey.md` to freeze experiment activity
+  during the contribution-type survey. Immediate new experiments are blocked;
+  Step-2-v2, Action-IV Step 3, new Powderworld tasks, and PSP/Dreamer
+  comparisons require a survey-driven path decision and a fresh precommit.
 
 ## v0.1.0
 
