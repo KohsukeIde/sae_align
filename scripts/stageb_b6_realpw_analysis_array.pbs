@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+#PBS -q rt_HC
+#PBS -l select=1
+#PBS -l walltime=04:00:00
+#PBS -P gag51404
+#PBS -j oe
+
+set -euo pipefail
+
+cd "${PBS_O_WORKDIR:-/groups/gag51404/ide/vgi/sae_align_repo}"
+
+TASK_FILE="${TASK_FILE:?TASK_FILE is required}"
+INDEX="${PBS_ARRAY_INDEX:?PBS_ARRAY_INDEX is required}"
+LINE="$(sed -n "${INDEX}p" "${TASK_FILE}")"
+if [[ -z "${LINE}" ]]; then
+  echo "[error] no task line for PBS_ARRAY_INDEX=${INDEX} in ${TASK_FILE}" >&2
+  exit 2
+fi
+
+read -r DATA_SEED SPLIT_SEED PCA_DIM <<< "${LINE}"
+export DATA_SEED SPLIT_SEED PCA_DIM
+
+if [[ -n "${STAGEB_ENV_PREFIX:-}" ]]; then
+  # shellcheck source=/dev/null
+  source "${STAGEB_ENV_PREFIX}/bin/activate"
+fi
+
+export PYTHON_BIN="${PYTHON_BIN:-python}"
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
+export OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-1}"
+export MKL_NUM_THREADS="${MKL_NUM_THREADS:-1}"
+export NUMEXPR_NUM_THREADS="${NUMEXPR_NUM_THREADS:-1}"
+
+bash scripts/run_stageb_b6_realpw_analysis_task.sh

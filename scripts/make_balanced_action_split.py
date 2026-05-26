@@ -46,6 +46,7 @@ def action_table(data: Mapping[str, np.ndarray]) -> list[dict[str, object]]:
     action_ids = np.asarray(data["action_id"], dtype=np.int64)
     action_types = np.asarray(data["action_type"]).astype(str)
     action_array = np.asarray(data["action_array"], dtype=np.float32)
+    schema = [str(x) for x in np.asarray(data.get("action_array_schema", []), dtype=str).tolist()]
     world_delta = np.asarray(data["world_delta"], dtype=np.float32)
     channels = [str(x) for x in np.asarray(data.get("channels", []), dtype=str).tolist()]
     physical_threshold = max(float(np.quantile(world_delta, 0.10)), 1e-8)
@@ -62,14 +63,34 @@ def action_table(data: Mapping[str, np.ndarray]) -> list[dict[str, object]]:
     for action_id in sorted(np.unique(action_ids).tolist()):
         mask = action_ids == int(action_id)
         arr = action_array[mask][0]
+        if schema:
+            values = {name: float(arr[i]) for i, name in enumerate(schema[: arr.shape[0]])}
+            x = float(values.get("x", values.get("xbin", 0.0)))
+            y = float(values.get("y", values.get("ybin", 0.0)))
+            element = int(values.get("element", values.get("elem", 0.0)))
+            dx = int(values.get("dx", 0.0))
+            dy = int(values.get("dy", 0.0))
+            radius = float(values.get("radius", 0.0))
+        elif arr.shape[0] >= 5:
+            x, y, element, dx, dy = float(arr[0]), float(arr[1]), int(arr[2]), int(arr[3]), int(arr[4])
+            radius = 0.0
+        elif arr.shape[0] == 4:
+            # RealPowderworldAdapter legacy action order: element, x, y, radius.
+            element, x, y, radius = int(arr[0]), float(arr[1]), float(arr[2]), float(arr[3])
+            dx, dy = 0, 0
+        else:
+            padded = np.pad(arr, (0, max(0, 5 - arr.shape[0])), mode="constant")
+            x, y, element, dx, dy = float(padded[0]), float(padded[1]), int(padded[2]), int(padded[3]), int(padded[4])
+            radius = 0.0
         row = {
             "action_id": int(action_id),
             "action_type": mode_str(action_types[mask]),
-            "x": float(arr[0]),
-            "y": float(arr[1]),
-            "element": int(arr[2]),
-            "dx": int(arr[3]),
-            "dy": int(arr[4]),
+            "x": x,
+            "y": y,
+            "element": element,
+            "dx": dx,
+            "dy": dy,
+            "radius": radius,
             "mean_world_delta": float(np.mean(world_delta[mask])),
             "std_world_delta": float(np.std(world_delta[mask])),
             "nonnull_rate": float(np.mean(world_delta[mask] > 0)),

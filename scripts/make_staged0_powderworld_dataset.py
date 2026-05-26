@@ -48,6 +48,32 @@ def make_backend(name, grid_size, seed, device, use_jit):
 def detect(delta): return float(np.mean(np.abs(delta.astype(np.float32))))
 def world_delta(a, b): return float(np.mean(np.asarray(a) != np.asarray(b)))
 
+def mean_blur_chw(x):
+    x = np.asarray(x, dtype=np.float32)
+    if x.ndim != 3:
+        raise ValueError(f"Expected CHW image for blur, got shape {x.shape}")
+    pad = np.pad(x, ((0, 0), (1, 1), (1, 1)), mode="edge")
+    out = np.zeros_like(x, dtype=np.float32)
+    for dy in range(3):
+        for dx in range(3):
+            out += pad[:, dy : dy + x.shape[1], dx : dx + x.shape[2]]
+    return (out / 9.0).astype(np.float32)
+
+def render_dataset_channel(env, grid, channel, action, noise_seed):
+    """Render real/toy backend channels plus RGB-derived redundancy controls."""
+    if channel == "noisy_rgb":
+        rgb = env.render_channel(grid, "rgb", action=action).astype(np.float32)
+        rng = np.random.default_rng(noise_seed)
+        return np.clip(rgb + rng.normal(0.0, 0.05, size=rgb.shape).astype(np.float32), 0.0, 1.0)
+    if channel == "gray_rgb":
+        rgb = env.render_channel(grid, "rgb", action=action).astype(np.float32)
+        gray = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]
+        return gray[None, :, :].astype(np.float32)
+    if channel == "blur_rgb":
+        rgb = env.render_channel(grid, "rgb", action=action).astype(np.float32)
+        return mean_blur_chw(rgb)
+    return env.render_channel(grid, channel, action=action).astype(np.float32)
+
 def summary_stats(values):
     x = np.asarray(values, dtype=np.float32).reshape(-1)
     if x.size == 0:
@@ -116,11 +142,38 @@ def main():
                 env.set_rollout_seed(row_seed)
             act = env.rollout(grid, action, horizon=horizon); wdelta[row] = world_delta(act.final_grid, noop.final_grid); delta_event[row] = act.event_vector - noop.event_vector
             for ch in channels:
-                obs0 = env.render_channel(grid, ch, action=action); obsa = env.render_channel(act.final_grid, ch, action=action); obsn = env.render_channel(noop.final_grid, ch, action=action)
+                seed_base = int((si + 1) * 100000 + (ai + 7) * 997)
+                obs0 = render_dataset_channel(env, grid, ch, action=action, noise_seed=seed_base)
+                obsa = render_dataset_channel(env, act.final_grid, ch, action=action, noise_seed=seed_base)
+                obsn = render_dataset_channel(env, noop.final_grid, ch, action=action, noise_seed=seed_base)
                 d = (obsa - obsn).astype(np.float32); detects[ch][row] = detect(d)
                 if keep[row]: dense_store[f"obs0_{ch}"].append(obs0.astype(np.float32)); dense_store[f"delta_{ch}"].append(d)
             if keep[row]: dense_world.append((act.final_grid != noop.final_grid).astype(np.float32)[None])
-    arrays = {"state_id": state_id, "action_id": action_id, "action_array": action_array, "action_type": action_type.astype(str), "world_delta": wdelta, "delta_event_response": delta_event, "delta_sample_indices": dense_idx}
+    arrays = {
+        "state_id": state_id,
+        "action_id": action_id,
+        "action_array": action_array,
+        "action_type": action_type.astype(str),
+        "world_delta": wdelta,
+        "delta_event_response": delta_event,
+        "delta_sample_indices": dense_idx,
+        "static_obs_sample_indices": dense_idx,
+        "event_names": np.array(list(getattr(env, "EVENT_NAMES", []))),
+        "channels": np.array(channels),
+        "grid_size": np.array([grid_size], dtype=np.int32),
+        "horizon": np.array([horizon], dtype=np.int32),
+        "seed": np.array([seed], dtype=np.int32),
+        "schema_version": np.array(["realpw_stageb_v1" if backend == "powderworld" else "toy_stageb_v1"]),
+        "dense_sampling": np.array([mode]),
+        "dense_state_ids": dense_states.astype(np.int32),
+        "touched_dense_state_ids": np.unique(dense_idx // k_actions).astype(np.int32),
+        "complete_dense_state_ids": dense_states.astype(np.int32) if mode == "full-states" else np.zeros(0, dtype=np.int32),
+        "max_delta_samples": np.array([max_rows], dtype=np.int32),
+        "store_static_obs": np.array([True]),
+        "diagnostic_only_channels": np.array(["event_response"]),
+        "stageb_default_channels": np.array([ch for ch in channels if ch in {"rgb", "range", "local", "noisy_rgb", "gray_rgb", "blur_rgb"}]),
+        "action_array_schema": np.array(["element", "x", "y", "radius"] if backend == "powderworld" else ["x", "y", "element", "dx", "dy"]),
+    }
     for ch, val in detects.items(): arrays[f"detect_{ch}"] = val
     for k, vals in dense_store.items():
         if vals: arrays[k] = np.stack(vals).astype(np.float32)
