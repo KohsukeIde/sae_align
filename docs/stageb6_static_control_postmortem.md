@@ -189,8 +189,14 @@ Therefore:
 
 ```text
 AERA implementation remains blocked.
-Path-Building / Sand-Pushing audit remains premature unless the survey argues
-for Framing D strongly enough to justify an environment-selection audit.
+Path-Building / Sand-Pushing audit remains premature.
+The next experiment is preregistered Stage B6R, not AERA and not task audit.
+```
+
+Stage B6R is preregistered in:
+
+```text
+docs/stageb6r_preregistration.md
 ```
 
 ## Output Files

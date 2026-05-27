@@ -220,11 +220,9 @@ Under the precommitted audit rules, this result is at best the **partial** branc
 effect size +0.03 to +0.05, but central static comparison fails
 ```
 
-If the survey still favors Framing D, the next experiment is not AERA-v1. It is
-the precommitted Path-Building / Sand-Pushing audit for selecting an
-observation-critical AERA evaluation environment. That audit should be
-precommitted separately because the current task-data script is DestroyAll
-specific.
+After the static-control postmortem, the next experiment is not AERA-v1 and not
+Path-Building / Sand-Pushing.  It is the preregistered B6R static-control
+replication in `docs/stageb6r_preregistration.md`.
 
 ## Static-Control Addendum
 
@@ -241,6 +239,9 @@ static-conditioned kNN, but this does not change the B6 v1 decision:
 static remains stronger in the original unconditioned real-Powderworld metric.
 AERA implementation remains blocked.
 ```
+
+The postmortem is discovery/reference evidence.  It motivates B6R but does not
+count as an independent replication.
 
 ## Output Files
 

@@ -12,8 +12,9 @@ what can be run experimentally before any AERA prototype is implemented.
 ## Thesis
 
 ```text
-The convergent object across observation channels is not the static
-representation, but the action-conditioned effect representation.
+Static alignment can capture shared scene layout across observation channels.
+Action-conditioned effect alignment should capture additional
+intervention-specific cross-modal structure that survives static controls.
 ```
 
 Working name:
@@ -24,7 +25,7 @@ AERA: Action-Effect Representation Alignment
 
 ## What AERA Is
 
-AERA would learn effect representations
+AERA would eventually learn effect representations
 
 ```text
 e_m(s, a) = f_m(o_m(s), o_m(s^a), a)
@@ -32,7 +33,9 @@ e_m(s, a) = f_m(o_m(s), o_m(s^a), a)
 
 and align `e_rgb(s,a)` with `e_range(s,a)` for the same state-action
 intervention.  The central object is the paired action effect, not a scalar
-sample weight.
+sample weight.  This document does not authorize AERA implementation; it only
+defines the gates that must pass before an AERA method specification can be
+written.
 
 ## What AERA Is Not
 
@@ -257,9 +260,91 @@ This does not invalidate the weaker analysis claim that action effects contain
 some cross-channel structure.  It only blocks the method claim that action
 effects are the better convergent object.
 
+## Phase 1.6: B6R Confirmatory Static-Control Replication
+
+The posthoc static-control diagnostic was supportive:
+
+```text
+static_residualized_probefit adjusted mean: +0.0444
+static_residualized_shuffled_probefit mean:  +0.0005
+static-conditioned action-effect bins:       all positive
+residualized CKNNA mean:                     +0.0329
+```
+
+However, it was selected after seeing that raw static alignment exceeded
+action-effect alignment.  It is discovery/reference evidence only.  It cannot
+be treated as an independent replication.
+
+Before AERA method specification can start, run Stage B6R as a fresh
+real-Powderworld static-control replication with new seeds:
+
+```text
+data seeds: 10, 11, 12
+split seeds: 101, 103, 107
+PCA dim: 32
+normalization: probe_action_type_apply
+k: 10
+jitter: 0
+target pair: rgb:range
+```
+
+The B6R primary estimand is not:
+
+```text
+action-effect beats raw static
+```
+
+It is:
+
+```text
+action-effect contains intervention-specific cross-modal structure that remains
+after static controls and exceeds matched shuffled controls.
+```
+
+### B6R Go
+
+Framing D-prime remains viable only if all of the following hold:
+
+```text
+static_residualized_probefit adjusted mean >= +0.03
+static_residualized_probefit positive in 9/9 runs
+static_residualized_shuffled_probefit mean <= +0.01
+static_residualized_probefit minus shuffled mean >= +0.03
+static_residualized CKNNA mean >= +0.02 and positive in 9/9 runs
+static-conditioned action-effect adjusted mean > 0 in every preregistered bin
+residual energy is not near zero in either channel
+```
+
+### B6R No-Go
+
+Stop the AERA route if:
+
+```text
+residualized action-effect disappears
+or residualized shuffled reaches similar magnitude
+or residualized CKNNA is near zero
+or static-conditioned alignment disappears in multiple bins
+or any required B6R run is missing
+```
+
+B6R can support only the revised thesis:
+
+```text
+static alignment captures shared scene layout;
+action-conditioned effect alignment captures additional intervention-specific
+cross-modal structure
+```
+
+It still cannot support the stronger old claim:
+
+```text
+the convergent object is not static representation but action-effect
+representation
+```
+
 ## Phase 3: AERA Prototype
 
-Blocked until both Phase 1 and Phase 2 pass.
+Blocked until Phase 1.6 and Phase 2 pass.
 
 Prototype Go thresholds, if opened later:
 
@@ -299,7 +384,10 @@ Action-IV Step 3, and it does not revive scalar weighting.
 
 ## Path-Building / Sand-Pushing Audit Rule
 
-Whether to run task suitability audit depends on the real Powderworld B6 result.
+Do not run task suitability audit before B6R and the novelty survey.  Under the
+revised Framing D-prime thesis, the central question is residualized
+intervention-specific alignment, not whether scalar weighting can be rescued on
+another task.
 
 ### Case 1: Clear B6 Pass
 
@@ -315,7 +403,7 @@ Action:
 
 ```text
 Do not run Path-Building / Sand-Pushing audit now.
-Proceed with Framing D primary after novelty survey.
+Proceed with Framing D-prime only after B6R and novelty survey.
 Use Action-IV Step-2 failure only as scalar-weighting motivation.
 ```
 
@@ -330,10 +418,9 @@ Condition:
 Action:
 
 ```text
-If static <= action-effect or the static-control gate passes, run task
-suitability audit only to select an AERA evaluation environment.
-If static > action-effect and the static-control gate has not passed, do not run
-the audit yet.
+Run task suitability audit only after B6R passes and after an AERA method spec
+defines why an official task is needed for evaluation.
+If B6R has not passed, do not run the audit.
 ```
 
 If Path-Building or Sand-Pushing is obs-critical and less action-shortcut
@@ -358,12 +445,12 @@ If continuing the project at all, switch to an analysis/evaluation fallback.
 Under that fallback, Path-Building / Sand-Pushing audit may become central
 evidence only if a new analysis-paper precommit says so.
 
-## Forbidden Until Phase-1/Phase-2 Pass
+## Forbidden Until Phase-1.6/Phase-2 Pass
 
 - AERA implementation;
 - Action-IV Step 3;
 - custom simulator development;
 - PSP / Dreamer / RL comparisons;
-- Path-Building / Sand-Pushing generation, except under the Case-2/Case-3 rules
-  above;
+- Path-Building / Sand-Pushing generation, except under a new post-B6R method
+  or analysis precommit;
 - loss-function tweaks under the AERA name.
