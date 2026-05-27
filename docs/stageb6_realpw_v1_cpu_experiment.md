@@ -226,6 +226,22 @@ observation-critical AERA evaluation environment. That audit should be
 precommitted separately because the current task-data script is DestroyAll
 specific.
 
+## Static-Control Addendum
+
+After this result, a posthoc static-control diagnostic was run and documented in:
+
+```text
+docs/stageb6_static_control_postmortem.md
+```
+
+It found that action-effect signal survives probe-fit static residualization and
+static-conditioned kNN, but this does not change the B6 v1 decision:
+
+```text
+static remains stronger in the original unconditioned real-Powderworld metric.
+AERA implementation remains blocked.
+```
+
 ## Output Files
 
 ```text

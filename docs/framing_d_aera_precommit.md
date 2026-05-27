@@ -1,6 +1,7 @@
 # Framing D / AERA Precommit
 
 Date: 2026-05-26 JST
+Updated: 2026-05-27 JST
 
 ## Scope
 
@@ -107,8 +108,16 @@ If:
 +0.03 <= rgb-range adjusted effect size < +0.05
 ```
 
-then the result is partial.  Do not implement AERA immediately.  First decide
-whether task suitability audit is needed to find an evaluation environment.
+then the result is partial.  Do not implement AERA immediately.
+
+If the partial result also has:
+
+```text
+static alignment > action-effect alignment
+```
+
+then task-audit / AERA-evaluation-environment search is still premature.  First
+run the static-control gate below.
 
 ### Phase-1 No-Go
 
@@ -151,6 +160,102 @@ No-go:
 ```text
 AERA is essentially an existing CRL / multi-view / contrastive objective
 ```
+
+## Phase 1.5: Static-Control Gate
+
+The real Powderworld B6 v1 result is:
+
+```text
+action-effect heldout mean: +0.0339
+static heldout mean:        +0.1179
+shuffled heldout mean:      +0.0031
+AE > static CI:             0/9
+AE > shuffled CI:           8/9
+```
+
+This supports:
+
+```text
+action-effect > shuffled
+```
+
+but not:
+
+```text
+action-effect > static
+```
+
+Therefore Framing D is not supported as a main claim yet.  AERA remains blocked
+until we can answer whether the action-effect signal is independent of static
+state similarity.
+
+This is a post-v1 explanatory diagnostic.  It cannot retroactively convert real
+Powderworld B6 v1 into a Framing-D pass, cannot satisfy the original Phase-1
+gate by itself, and cannot authorize AERA implementation.
+
+### Static-Control Experiments
+
+Run both controls on the existing real Powderworld B6 outputs:
+
+1. **Static-residualized action-effect alignment**
+   - build static state features `z_m(s)`
+   - build action-effect signatures `Delta z_m(s,a)`
+   - fit the same-channel static-to-action-effect residualizer on probe action
+     columns and apply it to held-out action columns
+   - compute cross-channel kNN / CKNNA on the residuals
+   - report residual energy per channel; near-zero residuals are invalid rather
+     than positive/negative evidence
+
+2. **Static-conditioned kNN**
+   - restrict candidate neighbors to bins with comparable static similarity
+   - test whether action-effect neighbors still align cross-channel within
+     those static-similarity bins
+   - recompute chance baselines inside the conditioned candidate sets
+
+### Static-Control Go
+
+Framing D remains viable only if:
+
+```text
+residualized action-effect > residualized shuffled by >= +0.03
+and CKNNA/cycle-kNN remain positive
+and static-conditioned action-effect > shuffled in at least the middle/high
+static-similarity bins
+```
+
+The primary residualized row is the probe-fit residualizer.  In-sample and
+cross-fit-over-evaluation-states residualizers are diagnostic-only.
+
+### Static-Control No-Go
+
+If:
+
+```text
+residualized action-effect disappears
+or residualized action-effect ~= residualized shuffled
+or static-conditioned action-effect disappears
+```
+
+then:
+
+```text
+Treat the B6 action-effect signal as largely static-similarity mediated.
+Stop the AERA route.
+Do not proceed to Path-Building / Sand-Pushing audit for Framing D.
+```
+
+Forbidden interpretation:
+
+```text
+Do not claim "action-effect is the convergent object" if static remains stronger
+under original unconditioned B6, if the positive result appears only after
+transductive residualization, or if conditioning choices were selected after
+seeing outputs.
+```
+
+This does not invalidate the weaker analysis claim that action effects contain
+some cross-channel structure.  It only blocks the method claim that action
+effects are the better convergent object.
 
 ## Phase 3: AERA Prototype
 
@@ -225,8 +330,10 @@ Condition:
 Action:
 
 ```text
-Run task suitability audit only to select an AERA evaluation environment.
-The audit is not central evidence for scalar-weighting failure.
+If static <= action-effect or the static-control gate passes, run task
+suitability audit only to select an AERA evaluation environment.
+If static > action-effect and the static-control gate has not passed, do not run
+the audit yet.
 ```
 
 If Path-Building or Sand-Pushing is obs-critical and less action-shortcut
@@ -260,4 +367,3 @@ evidence only if a new analysis-paper precommit says so.
 - Path-Building / Sand-Pushing generation, except under the Case-2/Case-3 rules
   above;
 - loss-function tweaks under the AERA name.
-
