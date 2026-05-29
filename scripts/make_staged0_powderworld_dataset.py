@@ -59,6 +59,17 @@ def mean_blur_chw(x):
             out += pad[:, dy : dy + x.shape[1], dx : dx + x.shape[2]]
     return (out / 9.0).astype(np.float32)
 
+def rgb_edge_chw(x):
+    """Observation-derived edge diagnostic from rendered RGB."""
+    x = np.asarray(x, dtype=np.float32)
+    if x.ndim != 3:
+        raise ValueError(f"Expected CHW image for edge, got shape {x.shape}")
+    gray = 0.299 * x[0] + 0.587 * x[1] + 0.114 * x[2]
+    edge = np.zeros_like(gray, dtype=np.float32)
+    edge[:, 1:] += np.abs(gray[:, 1:] - gray[:, :-1])
+    edge[1:, :] += np.abs(gray[1:, :] - gray[:-1, :])
+    return np.clip(edge, 0.0, 1.0)[None, :, :].astype(np.float32)
+
 def render_dataset_channel(env, grid, channel, action, noise_seed):
     """Render real/toy backend channels plus RGB-derived redundancy controls."""
     if channel == "noisy_rgb":
@@ -72,6 +83,9 @@ def render_dataset_channel(env, grid, channel, action, noise_seed):
     if channel == "blur_rgb":
         rgb = env.render_channel(grid, "rgb", action=action).astype(np.float32)
         return mean_blur_chw(rgb)
+    if channel == "edge":
+        rgb = env.render_channel(grid, "rgb", action=action).astype(np.float32)
+        return rgb_edge_chw(rgb)
     return env.render_channel(grid, channel, action=action).astype(np.float32)
 
 def summary_stats(values):
@@ -172,6 +186,7 @@ def main():
         "store_static_obs": np.array([True]),
         "diagnostic_only_channels": np.array(["event_response"]),
         "stageb_default_channels": np.array([ch for ch in channels if ch in {"rgb", "range", "local", "noisy_rgb", "gray_rgb", "blur_rgb"}]),
+        "derived_diagnostic_channels": np.array([ch for ch in channels if ch in {"edge"}]),
         "action_array_schema": np.array(["element", "x", "y", "radius"] if backend == "powderworld" else ["x", "y", "element", "dx", "dy"]),
     }
     for ch, val in detects.items(): arrays[f"detect_{ch}"] = val

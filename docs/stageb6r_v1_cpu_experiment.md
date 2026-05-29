@@ -95,7 +95,7 @@ B6 analysis reports: 9/9
 static-control reports: complete
 ```
 
-## Original Unconditioned B6 Rows
+## Unconditioned B6-Style Rows On B6R Seeds
 
 Primary `rgb:range` adjusted overlap:
 

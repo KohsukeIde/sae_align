@@ -262,6 +262,13 @@ effects are the better convergent object.
 
 ## Phase 1.6: B6R Confirmatory Static-Control Replication
 
+Status:
+
+```text
+completed: 2026-05-27 JST
+decision: strict No-go / near-miss
+```
+
 The posthoc static-control diagnostic was supportive:
 
 ```text
@@ -275,8 +282,8 @@ However, it was selected after seeing that raw static alignment exceeded
 action-effect alignment.  It is discovery/reference evidence only.  It cannot
 be treated as an independent replication.
 
-Before AERA method specification can start, run Stage B6R as a fresh
-real-Powderworld static-control replication with new seeds:
+Stage B6R was run as a fresh real-Powderworld static-control replication with
+new seeds:
 
 ```text
 data seeds: 10, 11, 12
@@ -312,7 +319,7 @@ static_residualized_shuffled_probefit mean <= +0.01
 static_residualized_probefit minus shuffled mean >= +0.03
 static_residualized CKNNA mean >= +0.02 and positive in 9/9 runs
 static-conditioned action-effect adjusted mean > 0 in every preregistered bin
-residual energy is not near zero in either channel
+residual_norm_fraction min >= 0.10 in both channels
 ```
 
 ### B6R No-Go
@@ -320,12 +327,27 @@ residual energy is not near zero in either channel
 Stop the AERA route if:
 
 ```text
+static_residualized_probefit adjusted mean < +0.03
+or static_residualized_probefit minus shuffled mean < +0.03
 residualized action-effect disappears
 or residualized shuffled reaches similar magnitude
 or residualized CKNNA is near zero
 or static-conditioned alignment disappears in multiple bins
+or residual_norm_fraction min < 0.10 in either channel
 or any required B6R run is missing
 ```
+
+B6R result:
+
+```text
+static_residualized_probefit adjusted mean: +0.0293
+static_residualized_probefit minus shuffled: +0.0263
+static_residualized CKNNA mean:              +0.0365
+```
+
+Therefore B6R did not pass.  It supports only weak directional non-static
+structure and does not authorize AERA, Action-IV Step 3, Path-Building /
+Sand-Pushing audit, PSP/Dreamer comparison, or custom simulator development.
 
 B6R can support only the revised thesis:
 
@@ -342,9 +364,191 @@ the convergent object is not static representation but action-effect
 representation
 ```
 
+## Phase 1.7: Static-Weak Setup Exploration
+
+B6R was a strict no-go / near-miss:
+
+```text
+static_residualized_probefit adjusted mean: +0.0293
+threshold:                                    +0.03
+static_residualized minus shuffled mean:      +0.0263
+threshold:                                    +0.03
+```
+
+The result still leaves one setup-level loophole:
+
+```text
+rgb:range may be an unusually static-strong pair because both channels render
+the same scene layout and occupancy.
+```
+
+Therefore, before deciding between Framing D and Framing D-prime, run a single
+exploratory real-Powderworld channel-pair sweep using existing-environment
+channels only.  This is not AERA, not confirmatory evidence, and not a task
+audit.  It cannot rescue B6R.  It can only nominate one frozen cell for a later
+preregistered replication on new seeds.
+
+Pairs:
+
+```text
+rgb:range
+rgb:edge
+rgb:local
+range:local
+rgb:noisy_rgb
+rgb:gray_rgb
+rgb:blur_rgb
+```
+
+Roles:
+
+```text
+rgb:range           static-strong reference pair
+rgb:edge            derived diagnostic pair
+rgb:local           action-site diagnostic pair
+range:local         geometry-vs-local diagnostic pair
+rgb:noisy/gray/blur redundancy controls
+```
+
+Primary report columns:
+
+```text
+pair
+static_adjusted
+action_effect_adjusted
+residualized_action_effect
+action_minus_static
+residualized_minus_shuffled
+CKNNA_action
+CKNNA_static
+CKNNA_residualized
+```
+
+### Static-Weak Exploration Interpretation
+
+A static-weak exploratory cell is candidate-generating only if all attempted
+cells are reported and the selected non-redundancy cell satisfies:
+
+```text
+all planned runs present
+raw static no longer strongly dominates action-effect
+static_residualized_probefit adjusted mean >= +0.03
+static_residualized_probefit minus shuffled mean >= +0.03
+static_residualized_shuffled_probefit mean <= +0.01
+residualized CKNNA mean >= +0.02 and positive in all runs
+static-conditioned action-effect adjusted mean > 0 and > shuffled in every bin
+residual_norm_fraction min >= 0.10 in both channels
+```
+
+Passing this exploratory screen does not authorize AERA.  It only permits
+writing a fresh confirmatory preregistration.
+
+If a non-redundancy diagnostic pair has:
+
+```text
+action_effect > static
+and action_effect > shuffled
+```
+
+then the stronger Framing D remains viable as a setup-dependent candidate for a
+future confirmatory run.
+
+If:
+
+```text
+action_effect ~= static
+and residualized_action_effect > shuffled
+```
+
+then Framing D-prime remains the honest working thesis.
+
+If:
+
+```text
+action_effect ~= shuffled
+```
+
+across all non-redundancy diagnostic pairs, stop the AERA route.
+
+If redundancy controls show the same residualized behavior as the proposed
+diagnostic pairs, treat the result as likely metric artifact and do not proceed
+to AERA.
+
+This phase is exploratory.  It can motivate a later preregistered run, but it
+cannot by itself authorize AERA implementation.
+
+Forbidden during static-weak exploration:
+
+```text
+new tasks
+Path-Building / Sand-Pushing generation
+custom simulators
+task audits
+C0/D0 detector variants
+Action-IV Step 3
+PSP / Dreamer / RL comparisons
+new observation channels beyond the listed real-Powderworld render/derived set
+threshold lowering after seeing outputs
+excluding failed cells
+changing residualizer/bin/k/PCA settings without labeling the result exploratory
+```
+
+### Static-Weak v2 Outcome
+
+The `v1` attempt exposed a split-validity loophole: the old real-Powderworld
+action bank sampled uniformly over material elements, so erase actions were too
+rare and `probe_action_type_apply` could be undefined.  The adapter now samples
+erase/place intervention families explicitly, and the exploratory run was
+restarted as `outputs/static_weak_realpw_v2_cpu`.
+
+Completed `v2` summary:
+
+```text
+runs: 9/9 complete
+
+rgb:range:
+  action-effect adjusted:          +0.0232
+  static adjusted:                 +0.0916
+  residualized action-effect:      +0.0247
+  residualized minus shuffled:     +0.0299
+  residualized CKNNA:              +0.0273
+  static-conditioned bins:         all positive
+
+rgb:local:
+  action-effect adjusted:          +0.1174
+  static adjusted:                 +0.0747
+  residualized action-effect:      +0.1087
+  residualized minus shuffled:     +0.1009
+  residualized CKNNA:              +0.0628
+  static-conditioned bins:         all positive
+  candidate screen:                pass
+```
+
+Decision:
+
+```text
+Framing D full strength is not established.
+Framing D-prime remains viable.
+AERA implementation remains blocked.
+```
+
+Reason:
+
+```text
+The only candidate-generating pair is rgb:local, but local is action-site
+conditioned and diagnostic-only.  The cleaner rgb:range pair remains
+static-dominated, although its residualized/static-conditioned signal is
+non-null and close to the preregistered residualized-minus-shuffled threshold.
+```
+
+This result can motivate a future preregistered diagnostic replication if the
+novelty survey supports a method path.  It does not authorize AERA, Action-IV
+Step 3, task audit, custom simulator work, PSP, Dreamer, or RL comparisons.
+
 ## Phase 3: AERA Prototype
 
-Blocked until Phase 1.6 and Phase 2 pass.
+Blocked until a fresh confirmatory post-static-weak preregistration and Phase 2
+both pass.
 
 Prototype Go thresholds, if opened later:
 

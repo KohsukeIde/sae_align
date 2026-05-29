@@ -81,8 +81,18 @@ class RealPowderworldAdapter:
         return grid
     def make_action_bank(self,k:int)->List[PWAction]:
         out=[]
+        empty_id=self.element_ids.get('empty',0)
+        place_elements=[e for e in self.action_elements if e != empty_id]
+        if not place_elements:
+            place_elements=list(self.action_elements)
         for _ in range(int(k)):
-            elem=int(self.rng.choice(self.action_elements)); typ='erase' if elem==self.element_ids.get('empty',0) else 'place'
+            # Sampling uniformly over elements makes erase actions too rare for
+            # probe/held-out action-type normalization.  Keep the bank mixed so
+            # each split can contain both intervention families.
+            if self.rng.random()<0.25:
+                elem=int(empty_id); typ='erase'
+            else:
+                elem=int(self.rng.choice(place_elements)); typ='place'
             out.append(PWAction(typ,elem,int(self.rng.integers(2,self.world_size-2)),int(self.rng.integers(2,self.world_size-2)),int(self.rng.choice([1,2,3],p=[.25,.55,.20]))))
         return out
     def apply_action(self,grid:np.ndarray,action:PWAction)->np.ndarray:

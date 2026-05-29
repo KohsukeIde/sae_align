@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+#PBS -q rt_HC
+#PBS -l select=1
+#PBS -l walltime=04:00:00
+#PBS -P gag51404
+#PBS -j oe
+
+set -euo pipefail
+
+cd "${PBS_O_WORKDIR:-/groups/gag51404/ide/vgi/sae_align_repo}"
+
+if [[ -n "${STAGEB_ENV_PREFIX:-}" ]]; then
+  # shellcheck source=/dev/null
+  source "${STAGEB_ENV_PREFIX}/bin/activate"
+fi
+
+export PYTHON_BIN="${PYTHON_BIN:-python}"
+export OMP_NUM_THREADS="${OMP_NUM_THREADS:-1}"
+export OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-1}"
+export MKL_NUM_THREADS="${MKL_NUM_THREADS:-1}"
+export NUMEXPR_NUM_THREADS="${NUMEXPR_NUM_THREADS:-1}"
+
+ROOT="${ROOT:-outputs/static_weak_realpw_v1_cpu}"
+OUT_CONTROLS="${OUT_CONTROLS:-${ROOT}/static_controls_static_weak_v1}"
+
+bash scripts/run_static_weak_static_controls.sh "${ROOT}" "${OUT_CONTROLS}"
+
